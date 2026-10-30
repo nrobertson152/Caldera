@@ -1,0 +1,26 @@
+name: Build AppImage
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: System libraries Qt needs
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0 libfuse2
+      - name: Test
+        run: python3 tests.py && python3 tests_migration.py
+      - name: Build
+        run: ./packaging/build_appimage.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: Caldera-AppImage, path: dist/*.AppImage }
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with: { files: dist/*.AppImage }

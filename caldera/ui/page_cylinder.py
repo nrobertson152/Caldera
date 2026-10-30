@@ -201,8 +201,8 @@ class CylinderCyclePage(CalculatorPage):
         ctl.addWidget(self.loop)
         ctl.addWidget(button('Restart', 'ghost', 'reset', self.restart))
         card.body.addLayout(ctl)
-        card.body.addWidget(label('Length is to scale; the bore is drawn taller when needed so it stays visible. Blue '
-                                  'chamber is pressurised, pale chamber drains to tank.', 'faint', wrap=True))
+        card.body.addWidget(label('Length is to scale; the bore is drawn taller when needed so it stays visible. The '
+                                  'bright chamber is pressurised; the pale one drains to tank.', 'faint', wrap=True))
         right.addWidget(card)
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(16)

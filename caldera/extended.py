@@ -76,8 +76,8 @@ def line_velocity(q, d, kind):
     for name, (a, b) in LINE_TYPES.items():
         rows.append([name, _range_text(a, b), round(b * math.pi * d * d / 4 / 0.3208, 2),
                      round(_min_id(q, b), 3) if q > 0 else 0.0, _hose_for(_min_id(q, b)) if q > 0 else '—'])
-    out['_table'] = (['Line type', 'Recommended velocity', 'Max flow in this ID (GPM)', 'Min ID for this flow (in)',
-                      'Smallest hose'], rows, [None, None, 'GPM', 'in', None])
+    out['_table'] = (['Line type', 'Recommended', 'Max flow (GPM)', 'Min ID (in)', 'Hose'], rows,
+                     [None, None, 'GPM', 'in', None])
     out['_checks'] = checks
     out['_notes'] = [LINE_ADVICE[kind],
                      'Recommended ranges follow the Parker hose-sizing nomograph (petroleum oil up to 315 SUS at 100 °F). '

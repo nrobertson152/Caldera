@@ -358,6 +358,8 @@ class CalculatorPage(ScrollPage):
             table = QTableWidget(len(rows), len(headers))
             table.setHorizontalHeaderLabels(headers)
             style_table(table, 40)
+            head = table.horizontalHeader()
+            head.setSectionResizeMode(0, head.ResizeMode.ResizeToContents)
             table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
             for r, row in enumerate(rows):

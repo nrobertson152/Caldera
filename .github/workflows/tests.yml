@@ -26,18 +26,6 @@ jobs:
         run: |
           set -o pipefail
           QT_QPA_PLATFORM=offscreen python3 -X faulthandler tests/test_interaction.py 2>&1 | tee interaction.log
-      - name: Screenshot 1 (temporary review aid)
-        if: always()
-        continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["seals","seals","seals"],"3.12":["seals","seals","seals"]}')[matrix.python-version][0] }}
-      - name: Screenshot 2 (temporary review aid)
-        if: false
-        continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["seals","seals","seals"],"3.12":["seals","seals","seals"]}')[matrix.python-version][1] }}
-      - name: Screenshot 3 (temporary review aid)
-        if: false
-        continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["seals","seals","seals"],"3.12":["seals","seals","seals"]}')[matrix.python-version][2] }}
       - name: Report interaction failure
         if: failure()
         run: |

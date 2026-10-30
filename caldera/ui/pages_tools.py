@@ -301,7 +301,7 @@ def seals_page(win):
 
     def all_fluids():
         fluids = list(SEAL_FLUIDS)
-        heads = ['MATERIAL'] + [SEAL_FLUIDS[f][0] if SEAL_FLUIDS[f][0] != '—' else f.split(' (')[0].split(' /')[0]
+        heads = ['MATERIAL'] + [SEAL_FLUIDS[f][0] if SEAL_FLUIDS[f][0] != '—' else f.split(' ')[0].rstrip(',/')
                                 for f in fluids]
         tbl = table(heads, len(SEAL_MATERIALS), 40)
         tbl.horizontalHeader().setSectionResizeMode(0, tbl.horizontalHeader().ResizeMode.ResizeToContents)

@@ -27,12 +27,16 @@ projects you can export, back up and share. It runs entirely on your machine: no
 - **21 live calculators.** No Calculate button: unit-aware result cards, a highlighted headline value, pass/fail
   banners and a sensitivity chart showing how each output responds to each input.
 - **Inputs that accept math.** Type `30/2`, `2*pi*1.5` or `1,234.5`. Use ↑ / ↓ to step a value (Shift for ×10).
+- **US customary or metric.** One setting switches every input, result, chart and caption between the two.
 - **Tabs and a command palette.** Work in several tabs, each with its own back / forward history, restored on
   launch. Press **Ctrl+K** to jump to any calculator, page or action.
-- **Reservoir / Drip Pan designer.** Tank and pan size, steel gauge, carbon or stainless, optional drip rail, oil
-  capacity, air gap and weights, with a rotatable 3D preview beside a real-size reference object.
-- **Projects and history.** Save results to projects; search, filter, pin, duplicate, move and compare
-  calculations side by side.
+- **Reservoir / Drip Pan designer.** Seven steel, stainless and aluminum alloys, gauge or plate thickness (to 1/2"),
+  optional drip rail, oil capacity, containment, weights and safety warnings, with a rotatable 3D preview beside a
+  real-size reference object.
+- **Practical tools.** Mixed-conductor conduit fill with a recommended conduit size, line velocity with recommended
+  ranges and hose size, an animated cylinder cycle, a 12-fluid seal compatibility guide and reference tables.
+- **Projects and history.** Save results with notes to projects; search, filter, pin, duplicate, move and compare
+  up to three calculations side by side.
 - **Reports and exports.** PDF project summaries, a test report builder with live preview, and CSV / XLSX export.
 - **Portable files.** Share a single project as a `.caldera` file (import as merge or copy), or back up the whole
   workspace as `.caldera_backup`. Saves are atomic, and a damaged workspace is set aside, never overwritten.

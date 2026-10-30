@@ -78,6 +78,7 @@ def cylinder():
 def seals():
     win.navigate('Seal Compatibility', force=True)
     from caldera.ui.widgets import Segmented
+    QTest.qWait(300)
     seg = [w for w in win.findChildren(Segmented) if w.isVisible()][-1]
     seg.current = 'All fluids'
     seg.changed.emit('All fluids')

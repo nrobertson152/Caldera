@@ -9,9 +9,9 @@ DEFAULTS = {
     'theme': 'Obsidian', 'projects': ['General'], 'active_project': 'General', 'history': [], 'presets': {},
     'drafts': {}, 'favorites': [], 'project_notes': {}, 'archived_projects': [], 'tables': {},
     'methodology_notes': {}, 'units': 'US Customary', 'precision': 3, 'auto_save': False, 'nav_collapsed': [],
-    'sidebar_collapsed': False, 'report_draft': {},
+    'sidebar_collapsed': False, 'report_draft': {}, 'note_drafts': {},
 }
-_DICT_KEYS = ('presets', 'drafts', 'project_notes', 'tables', 'report_draft', 'methodology_notes')
+_DICT_KEYS = ('presets', 'drafts', 'project_notes', 'tables', 'report_draft', 'methodology_notes', 'note_drafts')
 _LIST_KEYS = ('favorites', 'archived_projects', 'nav_collapsed')
 
 
@@ -49,6 +49,8 @@ def sanitize(data):
         d['precision'] = min(max(int(d.get('precision', 3)), 1), 10)
     except (TypeError, ValueError):
         d['precision'] = 3
+    if d.get('units') not in ('US Customary', 'Metric'):
+        d['units'] = 'US Customary'
     d['auto_save'] = bool(d.get('auto_save'))
     d['sidebar_collapsed'] = bool(d.get('sidebar_collapsed'))
     d['favorites'] = [f for f in d['favorites'] if isinstance(f, str)]

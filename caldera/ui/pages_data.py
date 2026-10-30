@@ -4,11 +4,12 @@ from datetime import datetime
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QApplication, QFrame, QGridLayout, QLineEdit, QMenu, QTableWidget, QTableWidgetItem,
-                               QWidget)
+from PySide6.QtWidgets import (QApplication, QFrame, QGridLayout, QLineEdit, QMenu, QPlainTextEdit, QTableWidget,
+                               QTableWidgetItem, QWidget)
 
 from ..registry import TOOLS
-from ..toolmeta import category_of, icon_of, split_label
+from .. import units
+from ..toolmeta import category_of, icon_of, parse_number, split_label
 from . import icons
 from .kit import IconTile, clear_layout, fit_table_height, page_header, section_title
 from .theme import current as T
@@ -59,7 +60,7 @@ class HistoryPage(ScrollPage):
             return
         bar = hbox(None, (0, 0, 0, 0), 12)
         self.search = QLineEdit()
-        self.search.setPlaceholderText('Filter by tool, project or value…')
+        self.search.setPlaceholderText('Filter by tool, project, value or note…')
         self.search.setClearButtonEnabled(True)
         self.search.setFixedHeight(40)
         self.search.textChanged.connect(lambda _t: self.populate())
@@ -116,7 +117,8 @@ class HistoryPage(ScrollPage):
             r = rows[i]
             if project != 'All projects' and r.get('project') != project:
                 continue
-            hay = ' '.join([str(r.get('tool', '')), str(r.get('project', '')), str(r.get('result', ''))]).casefold()
+            hay = ' '.join([str(r.get('tool', '')), str(r.get('project', '')), str(r.get('result', '')),
+                            str(r.get('note', ''))]).casefold()
             if needle and needle not in hay:
                 continue
             self.indices.append(i)
@@ -132,6 +134,8 @@ class HistoryPage(ScrollPage):
             if r.get('pinned'):
                 name.setIcon(icons.icon('star', t['warn'], 14, True))
             headline = str(r.get('result', '')).split('\n')[0]
+            if r.get('note'):
+                headline = '✎ ' + headline
             for c, item in enumerate((when, name, QTableWidgetItem(str(r.get('project', 'General'))),
                                       QTableWidgetItem(headline))):
                 if c in (0, 2):
@@ -197,11 +201,25 @@ class HistoryPage(ScrollPage):
             grid.setVerticalSpacing(5)
             for k, ((lbl, _d), value) in enumerate(zip(specs, inputs)):
                 nm, unit = split_label(lbl)
+                shown = str(value)
+                if not isinstance(_d, list) and units.convertible(nm, unit):
+                    try:
+                        shown = units.num_text(units.to_display(nm, unit, parse_number(value)))
+                    except ValueError:
+                        pass
+                    unit = units.display_unit(nm, unit)
                 grid.addWidget(label(nm, 'muted'), k, 0)
-                grid.addWidget(label('%s %s' % (value, unit if not isinstance(_d, list) else '')), k, 1,
-                               Qt.AlignmentFlag.AlignRight)
+                cell = label(('%s %s' % (shown, '' if isinstance(_d, list) else unit)).strip(), wrap=True)
+                cell.setAlignment(Qt.AlignmentFlag.AlignRight)
+                grid.addWidget(cell, k, 1)
             grid.setColumnStretch(0, 1)
             self.detail_lay.addLayout(grid)
+        self.detail_lay.addWidget(eyebrow('Note'))
+        note = QPlainTextEdit(str(rec.get('note', '')))
+        note.setPlaceholderText('Add a note to this result…')
+        note.setFixedHeight(76)
+        note.textChanged.connect(lambda: self._note_changed(idx, note.toPlainText()))
+        self.detail_lay.addWidget(note)
         self.detail_lay.addWidget(eyebrow('Result'))
         box = QFrame()
         box.setObjectName('tile')
@@ -224,8 +242,23 @@ class HistoryPage(ScrollPage):
         self.detail_lay.addWidget(button('Delete', 'danger', 'trash', lambda: self._delete(idx)))
 
     # ------------------------------------------------------------------ actions
+    def _note_changed(self, idx, text):
+        rec = self.win.data['history'][idx]
+        if text.strip():
+            rec['note'] = text
+        else:
+            rec.pop('note', None)
+        self.win.schedule_save()
+        for row, i in enumerate(self.indices):          # keep the ✎ marker in the list in step
+            if i == idx and self.table.item(row, 3):
+                head = str(rec.get('result', '')).split('\n')[0]
+                self.table.item(row, 3).setText(('✎ ' + head) if rec.get('note') else head)
+
     def _copy(self, rec):
-        QApplication.clipboard().setText(str(rec.get('result', '')))
+        text = str(rec.get('result', ''))
+        if rec.get('note'):
+            text += '\n\nNote: ' + str(rec['note'])
+        QApplication.clipboard().setText(text)
         self.win.toast('Result copied to clipboard')
 
     def _toggle_pin(self, idx):
@@ -457,7 +490,7 @@ def compare_page(win):
     page = ScrollPage()
     col = page.col
     rows = win.data['history']
-    col.addWidget(page_header('Compare Calculations', 'Pick any two saved results to see exactly what changed.',
+    col.addWidget(page_header('Compare Calculations', 'Pick two or three saved results to see exactly what changed.',
                               'Utilities'))
     if not rows:
         col.addWidget(empty_state('compare', 'Nothing to compare yet',
@@ -467,12 +500,15 @@ def compare_page(win):
         return page
     labels = ['%d.  %s  ·  %s  ·  %s' % (i + 1, r.get('tool', ''), r.get('project', 'General'),
                                          fmt_date(r.get('date', ''))) for i, r in enumerate(rows)]
+    NONE = '— none —'
     pick = hbox(None, (0, 0, 0, 0), 14)
     a = Combo(labels)
     b = Combo(labels)
+    c = Combo([NONE] + labels)
     a.setCurrentIndex(max(len(rows) - 2, 0))
     b.setCurrentIndex(len(rows) - 1)
-    for tag, combo in (('A', a), ('B', b)):
+    c.setCurrentIndex(0)
+    for tag, combo in (('A', a), ('B', b), ('C  (optional)', c)):
         wrap = vbox(None, (0, 0, 0, 0), 6)
         wrap.addWidget(eyebrow('Result ' + tag))
         wrap.addWidget(combo)
@@ -482,64 +518,86 @@ def compare_page(win):
     col.addLayout(host)
     col.addStretch(1)
 
+    def chosen():
+        out = [('A', rows[a.currentIndex()]), ('B', rows[b.currentIndex()])]
+        if c.currentIndex() > 0:
+            out.append(('C', rows[c.currentIndex() - 1]))
+        return out
+
     def render():
         clear_layout(host)
-        ra, rb = rows[a.currentIndex()], rows[b.currentIndex()]
+        picked = chosen()
         side = hbox(None, (0, 0, 0, 0), 16)
-        for tag, rec in (('A', ra), ('B', rb)):
+        for tag, rec in picked:
             card = Card(padding=18, spacing=8)
             head = hbox(None, (0, 0, 0, 0), 10)
             head.addWidget(Pill(tag))
-            head.addWidget(label(str(rec.get('tool', '')), 'h3'), 1)
+            head.addWidget(label(str(rec.get('tool', '')), 'h3', wrap=True), 1)
             card.body.addLayout(head)
             card.body.addWidget(label(fmt_date(rec.get('date', ''), True) + '  ·  ' + str(rec.get('project', '')), 'faint'))
+            if rec.get('note'):
+                card.body.addWidget(label('Note: ' + str(rec['note']), 'muted', wrap=True))
             card.body.addWidget(label(str(rec.get('result', '')), 'mono', wrap=True, selectable=True))
             side.addWidget(card, 1)
         host.addLayout(side)
 
-        pa, pb = _parse_result(ra.get('result', '')), _parse_result(rb.get('result', ''))
-        shared = [k for k in pa if k in pb]
+        parsed = [(tag, _parse_result(rec.get('result', ''))) for tag, rec in picked]
+        base = parsed[0][1]
+        shared = [k for k in base if all(k in p for _t, p in parsed[1:])]
         if not shared:
-            host.addWidget(Banner('warn', 'These two results share no common measurements, so there is nothing to diff.'))
+            host.addWidget(Banner('warn', 'These results share no common measurements, so there is nothing to diff.'))
             return
-        table = QTableWidget(len(shared), 5)
-        table.setHorizontalHeaderLabels(['MEASUREMENT', 'A', 'B', 'CHANGE', '%'])
+        others = parsed[1:]
+        headers = ['MEASUREMENT'] + [tag for tag, _p in parsed]
+        for tag, _p in others:
+            headers += ['%s − A' % tag, '%s vs A' % tag]
+        table = QTableWidget(len(shared), len(headers))
+        table.setHorizontalHeaderLabels(headers)
         style_table(table, 42)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        table.horizontalHeader().setSectionResizeMode(0, table.horizontalHeader().ResizeMode.ResizeToContents)
         for r, key in enumerate(shared):
-            (da, na), (db, nb) = pa[key], pb[key]
-            cells = [key, da, db, '—', '—']
-            color = None
-            if na is not None and nb is not None:
-                delta = nb - na
-                cells[3] = ('%+.6g' % delta) if delta else '0'
-                if na != 0:
-                    cells[4] = '%+.1f %%' % (delta / abs(na) * 100)
-                color = t['faint'] if delta == 0 else (t['good'] if delta > 0 else t['warn'])
-            for c, text in enumerate(cells):
-                item = QTableWidgetItem(text)
-                if c >= 3 and color:
+            da, na = base[key]
+            cells = [(key, None), (da, None)] + [(p[key][0], None) for _t, p in others]
+            for _tag, p in others:
+                db, nb = p[key]
+                delta_text, pct_text, color = '—', '—', None
+                if na is not None and nb is not None:
+                    delta = nb - na
+                    delta_text = ('%+.6g' % delta) if delta else '0'
+                    if na != 0:
+                        pct_text = '%+.1f %%' % (delta / abs(na) * 100)
+                    color = t['faint'] if delta == 0 else (t['good'] if delta > 0 else t['warn'])
+                cells += [(delta_text, color), (pct_text, color)]
+            for ci, (text, color) in enumerate(cells):
+                item = QTableWidgetItem(str(text))
+                if color:
                     item.setForeground(QColor(color))
-                table.setItem(r, c, item)
+                table.setItem(r, ci, item)
         fit_table_height(table)
-        host.addWidget(section_title('What changed'))
+        host.addWidget(section_title('What changed', 'relative to A'))
         host.addWidget(table)
-        if ra.get('tool') == rb.get('tool') and ra.get('tool') in TOOLS:
-            specs = TOOLS[ra['tool']][0]
-            changed = [(split_label(s[0])[0], x, y) for s, x, y in zip(specs, ra.get('inputs', []), rb.get('inputs', []))
-                       if str(x) != str(y)]
+        tools = {rec.get('tool') for _tag, rec in picked}
+        if len(tools) == 1 and picked[0][1].get('tool') in TOOLS:
+            specs = TOOLS[picked[0][1]['tool']][0]
+            ins = [rec.get('inputs', []) for _tag, rec in picked]
+            changed = []
+            for k, s_ in enumerate(specs):
+                vals = [str(i[k]) if k < len(i) else '' for i in ins]
+                if len(set(vals)) > 1:
+                    changed.append((split_label(s_[0]), vals))
             if changed:
-                host.addWidget(section_title('Inputs that differ'))
+                host.addWidget(section_title('Inputs that differ', 'saved values, US customary'))
                 box = Card(padding=16, spacing=6)
-                for nm, x, y in changed:
+                for (nm, unit), vals in changed:
                     row = hbox(None, (0, 0, 0, 0), 10)
-                    row.addWidget(label(nm, 'muted'), 1)
-                    row.addWidget(label('%s  →  %s' % (x, y), 'h3'))
+                    row.addWidget(label('%s%s' % (nm, (' (%s)' % unit) if unit else ''), 'muted'), 1)
+                    row.addWidget(label('  →  '.join(vals), 'h3'))
                     box.body.addLayout(row)
                 host.addWidget(box)
 
-    a.currentIndexChanged.connect(lambda _i: render())
-    b.currentIndexChanged.connect(lambda _i: render())
+    for combo in (a, b, c):
+        combo.currentIndexChanged.connect(lambda _i: render())
     render()
     return page

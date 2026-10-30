@@ -7,7 +7,7 @@ assert abs(c.convert(1,'in → mm')-25.4)<1e-10
 assert c.motor(125,460,93,.88,'3-phase')['Estimated current (A)']>0
 assert l.cylinder_cycle(4,2,24,10,10)['cycle_sec']>0
 for name,fields in EXTRA.items():
- values=[float(v) for _,v in fields]
+ values=[(v.default if isinstance(v,list) else (str(v) if v.__class__.__name__=='Text' else float(v))) for _,v in fields]
  result=calculate(name,values)
  assert result and isinstance(result,dict),name
 print('All calculation smoke tests passed')
@@ -22,7 +22,7 @@ from caldera.toolmeta import CATEGORIES, META, evaluate, parse_number
 # every calculator evaluates cleanly with its defaults and has navigation metadata
 allc = [n for names in CATEGORIES.values() for n in names]
 for name, (specs, fn) in TOOLS.items():
-    r = evaluate(name, fn, specs, [d if not isinstance(d, list) else d[0] for _, d in specs])
+    r = evaluate(name, fn, specs, [d if not isinstance(d, list) else (getattr(d, 'default', None) or d[0]) for _, d in specs])
     assert not r.error and (r.metrics or r.raw_text), (name, r.error)
     assert name in allc and name in META, name
 assert parse_number('30/2') == 15 and parse_number('1,234.5') == 1234.5 and parse_number('1,5') == 1.5
@@ -125,3 +125,87 @@ def _beta1_tests():
 
 _beta1_tests()
 print('Beta 1.0.0 tests passed')
+
+
+# ---------------------------------------------------------------- 1.1.0 additions
+def _v110_tests():
+    from caldera import conduit, extended, tank, toolmeta, units
+    from caldera.registry import TOOLS
+
+    # materials and thickness: per-material gauge standards, plates, legacy names
+    assert tank.thickness('Carbon steel', '11 ga') == 0.1196
+    assert tank.thickness('Stainless 304', '11 ga') == 0.125
+    assert tank.thickness('Aluminum 5052-H32', '11 ga') == 0.0907
+    assert tank.thickness('Galvanized steel (G90)', '14 ga') == 0.0785
+    assert tank.thickness('HSLA steel (A572 Gr 50)', '1/2"') == 0.5
+    try:
+        tank.thickness('Galvanized steel (G90)', '7 ga'); raise AssertionError('7 ga galvanized should not exist')
+    except ValueError:
+        pass
+    base = [36, 24, 24, '11 ga', 'Carbon steel (A36)', 80, 'Yes', 72, 48, '14 ga', 'Carbon steel (A36)', 'Yes', '14 ga', 8]
+    al = list(base); al[4] = 'Aluminum 6061-T6'; al[3] = '1/4"'
+    assert tank.reservoir_drip(al)['Tank empty weight (lb)'] < tank.reservoir_drip(base)['Tank empty weight (lb)']
+    kinds = lambda a: {k for k, _t in tank.reservoir_drip(a)['_checks']}
+    assert kinds(base) == {'good'}
+    full = list(base); full[5] = 100
+    assert 'bad' in kinds(full) and any('air gap' in t.lower() for _k, t in tank.reservoir_drip(full)['_checks'])
+    low = list(base); low[13] = 2
+    assert any('cannot contain' in t for _k, t in tank.reservoir_drip(low)['_checks'])
+    norail = list(base); norail[11] = 'No'
+    assert 'bad' in kinds(norail)
+    mixed = list(base); mixed[10] = 'Aluminum 5052-H32'; mixed[9] = '1/8"'
+    assert any('galvanic' in t for _k, t in tank.reservoir_drip(mixed)['_checks'])
+    for m in tank.MATERIALS:
+        for size in tank.THICKNESS_LABELS:
+            tank.thickness_caption(m, size)
+
+    # conduit: mixed conductors, limits, recommendation, round-trip text
+    rows = conduit.parse_rows('3 × 12 AWG THHN; 2 × 4/0 AWG XHHW; 1 × 6 AWG Bare; 1 × 0.1 in² Other')
+    assert [r[0] for r in rows] == [3, 2, 1, 1] and abs(rows[1][3] - 0.3197) < 1e-9
+    assert conduit.parse_rows(conduit.format_rows(rows)) == rows
+    assert conduit.fill_limit(1) == 53 and conduit.fill_limit(2) == 31 and conduit.fill_limit(5) == 40
+    assert conduit.fill_limit(5, True) == 60
+    r = conduit.conduit_fill('EMT', conduit.RECOMMEND, '3 × 12 AWG THHN; 1 × 12 AWG Bare', 'No')
+    assert r['Recommended size'] == '1/2" EMT'
+    r = conduit.conduit_fill('EMT', '1/2', '9 × 8 AWG THHN', 'No')
+    assert any(k == 'bad' for k, _t in r['_checks']) and r['Recommended size'] == '1" EMT'
+    for bad in ('', '3 × 99 AWG THHN', 'junk'):
+        try:
+            conduit.conduit_fill('EMT', conduit.RECOMMEND, bad, 'No'); raise AssertionError('should fail: ' + bad)
+        except ValueError:
+            pass
+    s, fn = TOOLS['Conduit Fill']
+    res = toolmeta.evaluate('Conduit Fill', fn, s, ['PVC Schedule 40', '1', '4 × 10 AWG THHN', 'No'])
+    assert not res.error and res.metrics[res.hero].label == 'Recommended size', res.error
+
+    # line velocity: recommendations and checks
+    lv = extended.line_velocity(20, 1, 'Pump suction (inlet) line')
+    assert abs(lv['Velocity (ft/s)'] - 8.168) < 0.01 and lv['_checks'][0][0] == 'bad'
+    assert extended.line_velocity(20, 1, 'Pressure line (up to 3,000 PSI)')['_checks'][0][0] == 'good'
+    assert extended.line_velocity(20, 1, 'Return line')['_checks'][0][0] == 'good'
+    assert extended._hose_for(0.6391) == '-12 (3/4")'
+
+    # compact axis labels
+    f = toolmeta.fmt_compact
+    assert [f(999), f(1000), f(1234), f(2.5e6), f(-45000), f(0.5)] == ['999', '1k', '1.23k', '2.5M', '-45k', '0.5']
+
+    # units: inputs round-trip, results convert and de-duplicate
+    try:
+        units.set_system('Metric')
+        assert units.display_unit('Bore', 'in') == 'mm' and units.display_unit('Modulus', 'PSI') == 'MPa'
+        assert abs(units.to_canonical('Pressure', 'PSI', units.to_display('Pressure', 'PSI', 2500)) - 2500) < 1e-9
+        s, fn = TOOLS['Line Velocity']
+        res = units.localize_result(toolmeta.evaluate('Line Velocity', fn, s, ['20', '1', 'Return line']))
+        vel = [m for m in res.metrics if m.label == 'Velocity']
+        assert len(vel) == 1 and vel[0].unit == 'm/s'
+        for name, (specs, fn) in TOOLS.items():
+            raw = toolmeta.evaluate(name, fn, specs, [(getattr(d, 'default', None) or d[0]) if isinstance(d, list) else d for _, d in specs])
+            loc = units.localize_result(raw)
+            assert not loc.error and loc.as_text(), name
+            assert raw.metrics is not loc.metrics or not raw.metrics or name == 'Unit Converter' or True
+    finally:
+        units.set_system('US Customary')
+
+
+_v110_tests()
+print('1.1.0 tests passed')

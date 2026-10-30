@@ -26,6 +26,14 @@ jobs:
         run: |
           set -o pipefail
           QT_QPA_PLATFORM=offscreen python3 -X faulthandler tests/test_interaction.py 2>&1 | tee interaction.log
+      - name: Screenshots A (temporary review aid)
+        if: always() && matrix.python-version == '3.11'
+        continue-on-error: true
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py res res_m conduit line
+      - name: Screenshots B (temporary review aid)
+        if: always() && matrix.python-version == '3.11'
+        continue-on-error: true
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py cyl seals ref cmp
       - name: Report interaction failure
         if: failure()
         run: |

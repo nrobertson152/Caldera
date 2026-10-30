@@ -138,6 +138,125 @@ for name in TOOL_PAGES:
             chart.grab()
 print('Sensitivity charts: %d chart views hovered OK' % charts_seen)
 assert charts_seen, 'no sensitivity chart was found on any page'
+
+# ---------------------------------------------------------------- 1.1.0: cylinder animation
+from caldera.ui.page_cylinder import CylinderCyclePage
+from caldera.ui.page_conduit import ConductorList
+from caldera.ui.widgets import Combo, Segmented
+from caldera import units
+from caldera.toolmeta import SYSTEM_PAGES
+
+
+def live(cls):
+    found = [w for w in win.findChildren(cls) if w.isVisible()]
+    assert found, 'no visible %s' % cls.__name__
+    return found[-1]
+
+
+win.navigate('Hydraulic Cylinder Cycle Time', force=True)
+pump()
+cyl = live(CylinderCyclePage)
+assert cyl.anim.valid, cyl.anim.message
+QTest.mouseClick(cyl.play_btn, LEFT)
+QTest.qWait(400)
+assert cyl._playing and cyl.anim.t > 0, 'animation did not advance'
+for name in ('5×', '¼×', '1×'):
+    cyl._speed_changed(name)
+    QTest.qWait(120)
+cyl.anim.grab()
+QTest.mouseClick(cyl.play_btn, LEFT)
+assert not cyl._playing
+cyl.restart()
+QTest.qWait(150)
+cyl.inputs[1].setText('99')            # rod bigger than bore -> error path must not crash the animation
+QTest.qWait(400)
+assert not cyl.anim.valid
+cyl.inputs[1].setText('2')
+QTest.qWait(400)
+assert cyl.anim.valid
+print('Cylinder animation OK')
+
+# ---------------------------------------------------------------- 1.1.0: conduit fill with mixed conductors
+win.navigate('Conduit Fill', force=True)
+pump()
+lst = live(ConductorList)
+before = len(lst.rows)
+lst._add_clicked()
+lst._add_clicked()
+pump()
+assert len(lst.rows) == before + 2
+lst.rows[-1].ins.set_value('XHHW / XHHW-2')
+lst.rows[-1].size.set_value('4/0')
+lst.rows[-1].qty.setText('3')
+lst.rows[-2].ins.set_value('Other (enter area)')
+lst.rows[-2].area.setText('0.2')
+QTest.qWait(400)
+cpage = lst.parentWidget()
+while cpage is not None and not hasattr(cpage, 'canon'):
+    cpage = cpage.parentWidget()
+assert cpage.canon and not cpage.canon.error, cpage.canon.error if cpage.canon else 'no result'
+assert '4/0' in cpage.values()[2] and 'Other' in cpage.values()[2], cpage.values()[2]
+lst._remove(lst.rows[0])
+QTest.qWait(300)
+assert not cpage.canon.error
+cpage.note_edit.setPlainText('Panel P-3 feeder')
+cpage.save_result()
+assert win.data['history'][-1].get('note') == 'Panel P-3 feeder'
+print('Conduit fill editor + notes OK')
+
+# ---------------------------------------------------------------- 1.1.0: reservoir materials / thickness relabel
+win.navigate('Reservoir / Drip Pan', force=True)
+pump()
+rpage = live(Viewer3D)
+while rpage is not None and not hasattr(rpage, 'canon'):
+    rpage = rpage.parentWidget()
+rpage.inputs[4].set_value('Aluminum 5052-H32')
+pump()
+assert 'mm' in rpage.inputs[3].currentText() or 'in' in rpage.inputs[3].currentText(), rpage.inputs[3].currentText()
+rpage.inputs[3].set_value('1/4"')
+rpage.inputs[5].setText('100')
+QTest.qWait(400)
+assert any(ok == 'bad' for ok, _t in rpage.canon.status), rpage.canon.status
+rpage.inputs[5].setText('80')
+QTest.qWait(400)
+print('Reservoir materials + checks OK')
+
+# ---------------------------------------------------------------- 1.1.0: seals, reference, compare views
+win.navigate('Seal Compatibility', force=True)
+pump()
+seg = live(Segmented)
+for view in list(seg.options):
+    seg.current = view
+    seg.changed.emit(view)
+    pump()
+win.navigate('Reference Tables', force=True)
+pump()
+seg = live(Segmented)
+for view in list(seg.options):
+    seg.current = view
+    seg.changed.emit(view)
+    pump()
+win.navigate('Compare Calculations', force=True)
+pump()
+combos = [c for c in win.findChildren(Combo) if c.isVisible()]
+assert len(combos) >= 3, len(combos)
+combos[2].setCurrentIndex(1)
+pump()
+print('Seals / reference / 3-way compare OK')
+
+# ---------------------------------------------------------------- 1.1.0: every page in metric units
+win.set_units('Metric')
+pump()
+assert units.metric()
+for name in [*SYSTEM_PAGES, *TOOL_PAGES]:
+    win.navigate(name, force=True)
+    pump()
+    win.grab()
+win.navigate('Hydraulic Pump & Motor', force=True)
+pump()
+win.set_units('US Customary')
+pump()
+print('Metric pass over every page OK')
 if errors:
     print('\n'.join(errors))
 sys.exit(1 if errors else 0)

@@ -10,7 +10,7 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QWidget
 
-from . import __version__, exports, workspace
+from . import __version__, exports, units, workspace
 from .registry import TOOL_PAGES, TOOLS
 from .toolmeta import CATEGORIES, SYSTEM_PAGES, blurb_of, icon_of
 from .ui import pages_core, pages_data, pages_tools, theme
@@ -56,6 +56,7 @@ class Window(QMainWindow):
         super().__init__()
         self.store_path = STORE
         self.data, self.notice = workspace.load(STORE)
+        units.set_system(self.data.get('units'))
         self.page = None
         self.tabs, self.active = self._restore_tabs()
         self.history_project = 'All projects'
@@ -122,6 +123,18 @@ class Window(QMainWindow):
     def update_option(self, key, value):
         self.data[key] = value
         self.schedule_save()
+
+    def set_units(self, name):
+        if name not in units.SYSTEMS or name == units.SYSTEM:
+            return
+        self.data['units'] = name
+        units.set_system(name)
+        self.schedule_save()
+        self.toast('Showing %s units' % ('metric' if units.metric() else 'US customary'), 'info')
+        QTimer.singleShot(0, lambda: self.navigate(self.current, force=True, record=False))
+
+    def toggle_units(self):
+        self.set_units('US Customary' if units.metric() else 'Metric')
 
     def closeEvent(self, ev):
         self.data['window'] = [self.width(), self.height()]
@@ -357,6 +370,7 @@ class Window(QMainWindow):
                                      ('Import project (.caldera)…', 'upload', self.import_project),
                                      ('Export active project (.caldera)…', 'download', lambda: self.export_project(self.data['active_project'])),
                                      ('Switch light / dark theme', 'sun', self.toggle_dark),
+                                     ('Switch metric / US customary units', 'ruler', self.toggle_units),
                                      ('Collapse or expand sidebar', 'layout', self.toggle_sidebar),
                                      ('Export history as CSV…', 'download', self.export_history),
                                      ('Export history as Excel…', 'table', self.export_history_xlsx),
@@ -396,12 +410,15 @@ class Window(QMainWindow):
         if hasattr(self.page, 'on_fav_changed'):
             self.page.on_fav_changed()
 
-    def add_history(self, tool, values, text):
+    def add_history(self, tool, values, text, note=''):
         project = self.data['active_project']
-        self.data['history'].append({'date': datetime.now().isoformat(timespec='seconds'), 'tool': tool,
-                                     'project': project, 'inputs': list(values), 'result': text})
+        rec = {'date': datetime.now().isoformat(timespec='seconds'), 'tool': tool, 'project': project,
+               'inputs': list(values), 'result': text}
+        if str(note).strip():
+            rec['note'] = str(note).strip()
+        self.data['history'].append(rec)
         self.save()
-        self.toast('Saved to “%s”' % project)
+        self.toast('Saved to “%s”%s' % (project, ' with a note' if rec.get('note') else ''))
 
     # ------------------------------------------------------------------ projects
     def new_project(self):

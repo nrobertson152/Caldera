@@ -6,8 +6,8 @@ from .extended import EXTRA, calculate as extra_calculate
 from . import tank
 from .toolmeta import Choice, Toggle
 
-_GA = lambda d: Choice(tank.GAUGE_LABELS, d)
-_MAT = lambda: Choice(tank.MATERIALS, 'Carbon steel')
+_GA = lambda d: Choice(tank.THICKNESS_LABELS, d)
+_MAT = lambda: Choice(tank.MATERIALS, 'Carbon steel (A36)')
 
 BASE={
  'Unit Converter':([('Value','1'),('Conversion',list(c.CONVERSIONS))],lambda a:{'Converted value':c.convert(a[0],a[1])}),
@@ -18,10 +18,10 @@ BASE={
  'Hydraulic Cylinder Cycle Time':([('Bore (in)','4'),('Rod (in)','2'),('Stroke (in)','24'),('Extend flow (GPM)','10'),('Retract flow (GPM)','10')],lambda a:l.cylinder_cycle(*a)),
  'Pneumatic Air Consumption':([('Bore (in)','3'),('Rod (in)','1'),('Stroke (in)','12'),('Pressure (PSIG)','90'),('Cycles/min','10'),('Atmospheric pressure (PSIA)','14.7')],lambda a:l.air_consumption(*a)),
  'Torque, RPM & Power':([('Torque (lb-ft)','100'),('RPM','1800')],lambda a:l.torque_power(*a)),
- 'Reservoir / Drip Pan':([('Tank length (in)','36'),('Tank width (in)','24'),('Tank height (in)','24'),('Tank steel gauge',_GA('11 ga')),
+ 'Reservoir / Drip Pan':([('Tank length (in)','36'),('Tank width (in)','24'),('Tank height (in)','24'),('Tank wall thickness',_GA('11 ga')),
    ('Tank material',_MAT()),('Fill level (%)','80'),('Closed top',Toggle(True)),
-   ('Pan length (in)','72'),('Pan width (in)','48'),('Pan steel gauge',_GA('14 ga')),('Pan material',_MAT()),
-   ('Drip rail',Toggle(True)),('Rail steel gauge',_GA('14 ga')),('Rail height (in)','8')],lambda a:tank.reservoir_drip(a)),
+   ('Pan length (in)','72'),('Pan width (in)','48'),('Pan thickness',_GA('3/16"')),('Pan material',_MAT()),
+   ('Drip rail',Toggle(True)),('Rail thickness',_GA('11 ga')),('Rail height (in)','8')],lambda a:tank.reservoir_drip(a)),
  'Wire Gauge & Voltage Drop':([('Load current (A)','15'),('One-way length (ft)','50'),('Supply voltage (V)','24'),('Max drop (%)','3'),('Conductor',['Copper','Aluminum']),('Temperature (°C)',['20','60','75','90'])],lambda a:c.wire(*a)),
 }
 TOOLS={**BASE,**{k:(v,lambda a,k=k:extra_calculate(k,a)) for k,v in EXTRA.items()}}

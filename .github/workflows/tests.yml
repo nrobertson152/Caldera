@@ -21,3 +21,5 @@ jobs:
         run: python3 tests/test_core.py && python3 tests/test_migration.py
       - name: GUI smoke test (offscreen)
         run: QT_QPA_PLATFORM=offscreen python3 tests/test_gui.py
+      - name: GUI interaction test (3D drag, chart hover)
+        run: QT_QPA_PLATFORM=offscreen python3 -X faulthandler tests/test_interaction.py

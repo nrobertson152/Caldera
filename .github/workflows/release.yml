@@ -17,6 +17,8 @@ jobs:
         with: { python-version: '3.11' }
       - name: System libraries Qt needs
         run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0 libfuse2
+      - name: Install Python packages
+        run: pip install -r requirements.txt
       - name: Test
         run: python3 tests.py && python3 tests_migration.py
       - name: Build

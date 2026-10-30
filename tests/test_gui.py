@@ -1,8 +1,10 @@
 """Real-Qt smoke test: opens the window headlessly, visits every page and saves a PNG of each to ./screenshots.
 
-    QT_QPA_PLATFORM=offscreen python3 tests_gui.py [theme]      (needs PySide6; theme defaults to the saved one)
+    QT_QPA_PLATFORM=offscreen python3 tests/test_gui.py [theme]      (needs PySide6; theme defaults to the saved one)
 
 Uses a throw-away data directory, so your real workspace is never touched."""
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1]))  # repo root, so `caldera` imports without installing
 import os
 import sys
 import tempfile

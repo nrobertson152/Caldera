@@ -1,4 +1,6 @@
 """Non-GUI migration regression checks."""
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1]))  # repo root, so `caldera` imports without installing
 from caldera.seal_data import SEAL_MATRIX
 from caldera import calculations as c
 from caldera import legacy_calculations as l

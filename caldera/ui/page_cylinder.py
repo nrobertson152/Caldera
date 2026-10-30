@@ -204,9 +204,9 @@ class CylinderCyclePage(CalculatorPage):
         card.body.addWidget(label('Length is to scale; the bore is drawn taller when needed so it stays visible. Blue '
                                   'chamber is pressurised, pale chamber drains to tank.', 'faint', wrap=True))
         right.addWidget(card)
-        self._timer = QTimer(self)
-        self._timer.setInterval(16)
-        self._timer.timeout.connect(self._tick)
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(16)
+        self._anim_timer.timeout.connect(self._tick)
         self._clock = QElapsedTimer()
         self._playing = False
 
@@ -230,12 +230,12 @@ class CylinderCyclePage(CalculatorPage):
                 self.anim.t = 0.0
             self._playing = True
             self._clock.start()
-            self._timer.start()
+            self._anim_timer.start()
             self._set_button()
 
     def _pause(self):
         self._playing = False
-        self._timer.stop()
+        self._anim_timer.stop()
         self._set_button()
 
     def restart(self):

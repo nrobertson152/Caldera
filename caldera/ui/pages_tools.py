@@ -364,6 +364,10 @@ def methodology_page(win):
     col = page.col
     col.addWidget(page_header('Methodology', blurb_of('Methodology') + ' Every number in Caldera is an estimate: '
                               'check inputs, units and applicable standards.', 'Utilities'))
+    if units.metric():
+        col.addWidget(Banner('warn', 'Formulas are written in US customary units, which is how Caldera calculates. '
+                                     'With metric units selected, your inputs are converted before the calculation and '
+                                     'the results are converted back for display.'))
     find = QLineEdit()
     find.setPlaceholderText('Filter by calculator or formula…')
     find.setClearButtonEnabled(True)

@@ -1,0 +1,18 @@
+QWidget {background:#151c24;color:#e9edf0;font-family:'Noto Sans',sans-serif;font-size:13px}
+QFrame#sidebar {background:#10161d;border-right:1px solid #34414c}
+QLabel#brand {font-size:27px;font-weight:800;color:#e5a46d;letter-spacing:2px}
+QLabel#heading {font-size:29px;font-weight:700;color:#f5f5f4;margin-bottom:4px}
+QLabel#muted {color:#9aa9b5;font-size:11px}
+QLineEdit,QComboBox,QTextEdit {background:#202a35;border:1px solid #394756;border-radius:7px;padding:9px;selection-background-color:#a75d39}
+QLineEdit:focus,QComboBox:focus {border:1px solid #d28c5d}
+QPushButton {background:#2b3845;border:1px solid #445262;border-radius:7px;padding:11px 16px}
+QPushButton:hover {background:#405063}
+QPushButton#primary {background:#bb7549;color:#151515;font-weight:700;border:0}
+QPushButton#primary:hover {background:#d99b6d}
+QListWidget {background:transparent;border:0;outline:0;padding-top:12px}
+QListWidget::item {padding:11px 9px;border-radius:6px}
+QListWidget::item:selected {background:#3a342f;color:#f6b17e}
+QListWidget::item:hover {background:#26313d}
+QScrollBar:vertical {background:#151c24;width:10px}
+QScrollBar::handle:vertical {background:#495665;border-radius:5px}
+QStatusBar {border-top:1px solid #34414c;color:#9aa9b5}

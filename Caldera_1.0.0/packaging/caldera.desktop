@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Caldera
+Comment=Offline engineering calculation workbench
+Exec=Caldera
+Icon=caldera
+Terminal=false
+Categories=Education;Science;Engineering;

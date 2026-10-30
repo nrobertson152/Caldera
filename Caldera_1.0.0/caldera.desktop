@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Caldera
+Comment=Engineering calculation workbench
+Exec=python3 /path/to/Caldera_1.0.0/main.py
+Icon=/path/to/Caldera_1.0.0/caldera/assets/caldera.svg
+Terminal=false
+Categories=Education;Science;Engineering;

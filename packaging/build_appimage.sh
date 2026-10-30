@@ -8,7 +8,7 @@ python3 -m venv .buildenv
 pip install --upgrade pip
 pip install -r requirements.txt pyinstaller
 pyinstaller --noconfirm --clean --name Caldera --windowed --paths . \
-    --add-data "caldera/assets:caldera/assets" main.py
+    --add-data "caldera/assets:caldera/assets" packaging/launcher.py
 
 APPDIR=build/Caldera.AppDir
 rm -rf "$APPDIR"; mkdir -p "$APPDIR/usr/bin"
@@ -28,16 +28,7 @@ assert img.save('build/Caldera.AppDir/caldera.png')
 PY
 cp "$APPDIR/caldera.png" "$APPDIR/.DirIcon"
 
-cat > "$APPDIR/caldera.desktop" <<'DESK'
-[Desktop Entry]
-Type=Application
-Name=Caldera
-Comment=Offline engineering calculation workbench
-Exec=Caldera
-Icon=caldera
-Terminal=false
-Categories=Science;Engineering;
-DESK
+cp packaging/caldera.desktop "$APPDIR/caldera.desktop"
 
 cat > "$APPDIR/AppRun" <<'RUN'
 #!/bin/sh

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.buildenv/
+
+# Build output
+build/
+dist/
+*.spec
+*.AppImage
+
+# Test output
+screenshots/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

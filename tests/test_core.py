@@ -1,4 +1,6 @@
-"""Non-GUI smoke tests; run with python3 tests.py."""
+"""Non-GUI smoke tests; run with python3 tests/test_core.py."""
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[1]))  # repo root, so `caldera` imports without installing
 from caldera import calculations as c, legacy_calculations as l
 from caldera.extended import EXTRA, calculate
 assert abs(c.convert(1,'in → mm')-25.4)<1e-10

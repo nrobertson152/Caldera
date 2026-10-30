@@ -1,0 +1,23 @@
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ matrix.python-version }}' }
+      - name: System libraries Qt needs
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+      - name: Calculation and workspace tests
+        run: python3 tests/test_core.py && python3 tests/test_migration.py
+      - name: GUI smoke test (offscreen)
+        run: QT_QPA_PLATFORM=offscreen python3 tests/test_gui.py

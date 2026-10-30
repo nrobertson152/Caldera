@@ -36,14 +36,22 @@ def scroll_page(y):
 def shot(name, prep=None, scroll=0):
     if prep:
         prep()
-    QTest.qWait(250)
-    scroll_page(scroll)
-    QTest.qWait(80)
-    img = win.grab().toImage().scaledToWidth(1000, Qt.TransformationMode.SmoothTransformation)
+    QTest.qWait(700)
+    page = win.page
+    if page.graphicsEffect() is not None:
+        page.setGraphicsEffect(None)
+    target = page.widget() if hasattr(page, 'widget') and page.widget() is not None else page
+    QTest.qWait(50)
+    img = target.grab().toImage()
+    if scroll:
+        img = img.copy(0, scroll, img.width(), min(img.height() - scroll, 1600))
+    else:
+        img = img.copy(0, 0, img.width(), min(img.height(), 1600))
+    img = img.scaledToWidth(900, Qt.TransformationMode.SmoothTransformation)
     data = QByteArray()
     buf = QBuffer(data)
     buf.open(QIODevice.OpenModeFlag.WriteOnly)
-    img.save(buf, 'JPEG', 50)
+    img.save(buf, 'JPEG', 45)
     text = base64.b64encode(bytes(data)).decode()
     return name, text
 

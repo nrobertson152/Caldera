@@ -29,11 +29,15 @@ jobs:
       - name: Screenshots A (temporary review aid)
         if: always() && matrix.python-version == '3.11'
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py res res_m conduit line
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py res res_m conduit
       - name: Screenshots B (temporary review aid)
         if: always() && matrix.python-version == '3.11'
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py cyl seals ref cmp
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py line cyl seals
+      - name: Screenshots C (temporary review aid)
+        if: always() && matrix.python-version == '3.11'
+        continue-on-error: true
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ref cmp pump
       - name: Report interaction failure
         if: failure()
         run: |

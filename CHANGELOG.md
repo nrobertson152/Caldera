@@ -5,6 +5,19 @@ All notable changes to Caldera are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-30
+
+### Fixed
+- Rotating the 3D preview in Reservoir / Drip Pan no longer crashes the app.
+- Hovering or otherwise interacting with the sensitivity charts no longer crashes the app.
+  Both crashes came from a bug in PySide6 6.12.0: on Python 3.10/3.11, each paint call leaked a
+  reference to `None` until Python aborted ("deallocating None"). Views that repaint continuously hit it within seconds.
+  PySide6 is now pinned below 6.12, and the AppImage is built on Python 3.12, which is not affected.
+
+### Added
+- `tests/test_interaction.py`: drags, zooms and resets the 3D viewer and hovers every sensitivity chart under real Qt;
+  runs in CI on Python 3.10-3.12.
+
 ### Changed
 - Repository restructured: the application now lives at the repository root (`caldera/`, `tests/`, `packaging/`)
   instead of inside a `Caldera_1.0.0/` folder.

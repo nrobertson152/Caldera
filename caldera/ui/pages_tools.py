@@ -9,7 +9,7 @@ from PySide6.QtGui import QColor, QDesktopServices, QIcon
 from PySide6.QtWidgets import (QAbstractItemView, QBoxLayout, QFrame, QGridLayout, QLineEdit, QPlainTextEdit,
                                QTableWidget, QTableWidgetItem, QWidget)
 
-from .. import exports
+from .. import __version__, exports
 from ..registry import TOOLS
 from ..seal_data import SEAL_MATRIX
 from ..toolmeta import CATEGORIES, DEFAULT_NOTE, FORMULAS, NOTES, blurb_of, icon_of, parse_number
@@ -112,7 +112,7 @@ def about_page(win):
     titles.addWidget(label('Caldera', 'display'))
     titles.addWidget(label('Offline engineering calculation and project workspace.', 'muted'))
     pills = hbox(None, (0, 6, 0, 0), 8)
-    pills.addWidget(Pill('Version 1.0.0'))
+    pills.addWidget(Pill("Version " + __version__))
     pills.addWidget(Pill('Qt 6 · PySide6', 'Muted'))
     pills.addWidget(Pill('GPL-3.0', 'Muted'))
     pills.addStretch(1)

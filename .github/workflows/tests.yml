@@ -29,15 +29,15 @@ jobs:
       - name: Screenshot 1 (temporary review aid)
         if: always()
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["conduit","conduit","conduit"],"3.12":["line","line","line"]}')[matrix.python-version][0] }}
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["ref","ref","ref"],"3.12":["cyl","cyl","cyl"]}')[matrix.python-version][0] }}
       - name: Screenshot 2 (temporary review aid)
         if: false
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["conduit","conduit","conduit"],"3.12":["line","line","line"]}')[matrix.python-version][1] }}
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["ref","ref","ref"],"3.12":["cyl","cyl","cyl"]}')[matrix.python-version][1] }}
       - name: Screenshot 3 (temporary review aid)
         if: false
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["conduit","conduit","conduit"],"3.12":["line","line","line"]}')[matrix.python-version][2] }}
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["seals","seals","seals"],"3.11":["ref","ref","ref"],"3.12":["cyl","cyl","cyl"]}')[matrix.python-version][2] }}
       - name: Report interaction failure
         if: failure()
         run: |

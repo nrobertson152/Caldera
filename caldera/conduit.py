@@ -173,7 +173,7 @@ def conduit_fill(conduit_type, trade_size, rows_text, nipple):
             table_rows.append([kind, size + '"', CONDUITS[kind][size], round(total / CONDUITS[kind][size] * 100, 1)])
         else:
             table_rows.append([kind, 'too large', '—', '—'])
-    out['_table'] = (['Conduit', 'Smallest size', 'Area (in²)', 'Fill (%)'], table_rows,
+    out['_table'] = (['Conduit', 'Size', 'Area (in²)', 'Fill (%)'], table_rows,
                      [None, None, 'in²', None])
     out['_checks'] = checks
     detail = ', '.join('%d × %s' % (q, ('%s %s' % (size_text(s), SHORT.get(i, i))) if s else ('%.4g in²' % a))

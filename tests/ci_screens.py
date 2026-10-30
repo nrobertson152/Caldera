@@ -104,12 +104,16 @@ plans = {
     'pump': ('pump_chart', nav('Hydraulic Pump & Motor'), 500),
 }
 shots = []
+import traceback
 for key in which:
     title, prep, scroll = plans[key]
     if key != 'res_m' and A.units.metric():
         win.set_units('US Customary')
         QTest.qWait(50)
-    shots.append(shot(title, prep, scroll))
+    try:
+        shots.append(shot(title, prep, scroll))
+    except Exception:
+        print('::error title=shot-failed::' + traceback.format_exc().replace('\n', '%0A'))
 kinds = ['notice'] * 10 + ['warning'] * 10
 k = 0
 CH = 3900

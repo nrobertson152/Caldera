@@ -22,4 +22,14 @@ jobs:
       - name: GUI smoke test (offscreen)
         run: QT_QPA_PLATFORM=offscreen python3 tests/test_gui.py
       - name: GUI interaction test (3D drag, chart hover)
-        run: QT_QPA_PLATFORM=offscreen python3 -X faulthandler tests/test_interaction.py
+        run: |
+          set -o pipefail
+          QT_QPA_PLATFORM=offscreen python3 -X faulthandler tests/test_interaction.py 2>&1 | tee interaction.log
+      - name: Report interaction failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os
+          text = open('interaction.log', errors='replace').read()[-6000:] if os.path.exists('interaction.log') else 'no log'
+          print('::error title=interaction test::' + text.replace('%', '%25').replace('\r', '').replace('\n', '%0A'))
+          PY

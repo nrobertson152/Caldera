@@ -7,6 +7,7 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.10', '3.11', '3.12']
     steps:
@@ -17,6 +18,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
       - name: Install Python packages
         run: pip install -r requirements.txt
+      - name: Diagnose None refcount
+        run: |
+          QT_QPA_PLATFORM=offscreen python3 tests/diag_none.py > diag.log 2>&1 || true
+          python3 -c "t=open('diag.log').read(); print('::warning title=diag::'+t.replace('%','%25').replace(chr(10),'%0A'))"
       - name: Calculation and workspace tests
         run: python3 tests/test_core.py && python3 tests/test_migration.py
       - name: GUI smoke test (offscreen)

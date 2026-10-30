@@ -8,6 +8,9 @@ permissions:
 jobs:
   appimage:
     runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: Caldera_1.0.0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,10 +20,10 @@ jobs:
       - name: Test
         run: python3 tests.py && python3 tests_migration.py
       - name: Build
-        run: ./packaging/build_appimage.sh
+        run: bash packaging/build_appimage.sh
       - uses: actions/upload-artifact@v4
-        with: { name: Caldera-AppImage, path: dist/*.AppImage }
+        with: { name: Caldera-AppImage, path: Caldera_1.0.0/dist/*.AppImage }
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
-        with: { files: dist/*.AppImage }
+        with: { files: Caldera_1.0.0/dist/*.AppImage }

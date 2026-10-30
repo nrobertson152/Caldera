@@ -26,18 +26,18 @@ jobs:
         run: |
           set -o pipefail
           QT_QPA_PLATFORM=offscreen python3 -X faulthandler tests/test_interaction.py 2>&1 | tee interaction.log
-      - name: Screenshots A (temporary review aid)
-        if: always() && matrix.python-version == '3.11'
+      - name: Screenshot 1 (temporary review aid)
+        if: always()
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py res res_m conduit
-      - name: Screenshots B (temporary review aid)
-        if: always() && matrix.python-version == '3.11'
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["res","res_m","conduit"],"3.11":["line","cyl","seals"],"3.12":["ref","cmp","pump"]}')[matrix.python-version][0] }}
+      - name: Screenshot 2 (temporary review aid)
+        if: always()
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py line cyl seals
-      - name: Screenshots C (temporary review aid)
-        if: always() && matrix.python-version == '3.11'
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["res","res_m","conduit"],"3.11":["line","cyl","seals"],"3.12":["ref","cmp","pump"]}')[matrix.python-version][1] }}
+      - name: Screenshot 3 (temporary review aid)
+        if: always()
         continue-on-error: true
-        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ref cmp pump
+        run: QT_QPA_PLATFORM=offscreen python3 tests/ci_screens.py ${{ fromJSON('{"3.10":["res","res_m","conduit"],"3.11":["line","cyl","seals"],"3.12":["ref","cmp","pump"]}')[matrix.python-version][2] }}
       - name: Report interaction failure
         if: failure()
         run: |

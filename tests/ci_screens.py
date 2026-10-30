@@ -44,14 +44,14 @@ def shot(name, prep=None, scroll=0):
     QTest.qWait(50)
     img = target.grab().toImage()
     if scroll:
-        img = img.copy(0, scroll, img.width(), min(img.height() - scroll, 1600))
+        img = img.copy(0, scroll, img.width(), min(img.height() - scroll, 1500))
     else:
-        img = img.copy(0, 0, img.width(), min(img.height(), 1600))
-    img = img.scaledToWidth(900, Qt.TransformationMode.SmoothTransformation)
+        img = img.copy(0, 0, img.width(), min(img.height(), 1500))
+    img = img.scaledToWidth(680, Qt.TransformationMode.SmoothTransformation)
     data = QByteArray()
     buf = QBuffer(data)
     buf.open(QIODevice.OpenModeFlag.WriteOnly)
-    img.save(buf, 'JPEG', 45)
+    img.save(buf, 'JPEG', 38)
     text = base64.b64encode(bytes(data)).decode()
     return name, text
 
@@ -112,7 +112,7 @@ for key in which:
     shots.append(shot(title, prep, scroll))
 kinds = ['notice'] * 10 + ['warning'] * 10
 k = 0
-CH = 30000
+CH = 3900
 for title, text in shots:
     parts = [text[i:i + CH] for i in range(0, len(text), CH)]
     for i, part in enumerate(parts):

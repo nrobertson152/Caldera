@@ -117,6 +117,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together
 python3 tests/test_core.py          # calculators, parsing, workspace, exports (no Qt needed)
 python3 tests/test_migration.py     # regression values from the earlier app (no Qt needed)
 QT_QPA_PLATFORM=offscreen python3 tests/test_gui.py [Theme]   # opens every page, saves screenshots/
+QT_QPA_PLATFORM=offscreen python3 tests/test_interaction.py        # drags the 3D view, hovers every chart
 ```
 
 The GUI test uses a throw-away data folder, so your own workspace is never touched.

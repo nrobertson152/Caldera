@@ -10,7 +10,7 @@
 [![Tests](https://github.com/nrobertson152/caldera/actions/workflows/tests.yml/badge.svg)](https://github.com/nrobertson152/caldera/actions/workflows/tests.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Platform](https://img.shields.io/badge/platform-Linux-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)
 
 [Download](#installation) · [Features](#features) · [Calculators](#calculators) · [Development](#development) · [Changelog](CHANGELOG.md)
 
@@ -56,7 +56,14 @@ The **Methodology** page in the app lists the formula behind each calculator.
 
 ## Installation
 
-### AppImage (recommended)
+### Windows
+
+Download `Caldera-<version>-windows-x64.exe` from the
+[latest release](https://github.com/nrobertson152/caldera/releases/latest) and run it; nothing needs installing.
+The program isn't code-signed, so Windows SmartScreen may show "Windows protected your PC" the first time:
+choose **More info → Run anyway**. Your workspace is stored in `%APPDATA%\Caldera`.
+
+### Linux: AppImage (recommended)
 
 Download `Caldera-<version>-x86_64.AppImage` from the
 [latest release](https://github.com/nrobertson152/caldera/releases/latest), then:

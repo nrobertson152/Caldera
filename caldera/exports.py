@@ -1,6 +1,7 @@
 """File exports (PDF, CSV, XLSX, text). Pure Python - no Qt - so they can be unit tested headlessly."""
 import csv
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -14,10 +15,15 @@ _FONT_CANDIDATES = [
     ('/usr/share/fonts/TTF/DejaVuSans.ttf', '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
      '/usr/share/fonts/TTF/DejaVuSansMono.ttf'),
 ]
+_WIN_FONTS = Path(os.environ.get('WINDIR', r'C:\Windows')) / 'Fonts'
+_FONT_CANDIDATES += [
+    (str(_WIN_FONTS / 'segoeui.ttf'), str(_WIN_FONTS / 'segoeuib.ttf'), str(_WIN_FONTS / 'consola.ttf')),
+    (str(_WIN_FONTS / 'arial.ttf'), str(_WIN_FONTS / 'arialbd.ttf'), str(_WIN_FONTS / 'cour.ttf')),
+]
 
 
 def _register_fonts():
-    """Use DejaVu (full Unicode: ⁴ → ≈ − ²) when available; otherwise fall back to built-in Helvetica/Courier."""
+    """Use DejaVu (Linux) or Segoe UI / Arial (Windows) for wide Unicode coverage; else built-in Helvetica/Courier."""
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     for regular, bold, mono in _FONT_CANDIDATES:

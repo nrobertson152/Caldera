@@ -19,6 +19,8 @@ def data_dir():
     base = os.environ.get('CALDERA_DATA')
     if base:
         return Path(base)
+    if os.name == 'nt':                                   # Windows: %APPDATA%\Caldera
+        return Path(os.environ.get('APPDATA') or Path.home() / 'AppData' / 'Roaming') / 'Caldera'
     xdg = os.environ.get('XDG_DATA_HOME')
     return (Path(xdg) if xdg else Path.home() / '.local' / 'share') / 'caldera'
 

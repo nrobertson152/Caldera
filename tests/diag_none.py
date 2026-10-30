@@ -27,13 +27,12 @@ tests = {
  'fm.elidedText': lambda: fm.elidedText('abc', Qt.TextElideMode.ElideRight, 20), 'fm.horizontalAdvance': lambda: fm.horizontalAdvance('abc'),
  'QPolygonF(list)': lambda: QPolygonF([QPointF(0, 0), QPointF(1, 1)]), 'QPointF-QPointF': lambda: QPointF(1, 1) - QPointF(0, 0),
 }
-lines = ['PySide6 %s, Python %s' % (PySide6.__version__, sys.version.split()[0])]
+print('PySide6 %s, Python %s' % (PySide6.__version__, sys.version.split()[0]), flush=True)
 for name, fn in tests.items():
     fn()
     before = sys.getrefcount(None)
-    for _ in range(1000):
+    for _ in range(20):
         fn()
     lost = before - sys.getrefcount(None)
-    lines.append('%-28s None refs lost per 1000 calls: %d%s' % (name, lost, '   <-- LEAK' if lost >= 900 else ''))
+    print('%-28s lost/20: %d%s' % (name, lost, '   <-- LEAK' if lost >= 15 else ''), flush=True)
 p.end()
-print('\n'.join(lines))

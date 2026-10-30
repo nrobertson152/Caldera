@@ -34,13 +34,13 @@ class Viewer3D(QWidget):
     # ------------------------------------------------------------------ interaction
     def mousePressEvent(self, ev):
         if ev.button() == Qt.MouseButton.LeftButton:
-            self._drag = ev.position()
+            self._drag = QPointF(ev.position())
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
     def mouseMoveEvent(self, ev):
         if self._drag is not None:
             d = ev.position() - self._drag
-            self._drag = ev.position()
+            self._drag = QPointF(ev.position())
             self.yaw -= d.x() * 0.01
             self.pitch = min(max(self.pitch + d.y() * 0.01, 0.03), 1.5)
             self.update()

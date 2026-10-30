@@ -5,17 +5,17 @@ scene, back-face culls, depth-sorts and returns flat 2D polygons ready to paint 
 """
 import math
 
-from . import tank
+from . import tank, units
 
 # real, common objects used as a size reference (inches)
 REFERENCES = {
-    'Soda can (12 oz)': dict(kind='cyl', r0=1.30, r1=1.30, h=4.83, color='#d9453d', label='12 oz can, 2.6 in dia × 4.83 in'),
-    '5-gallon bucket': dict(kind='cyl', r0=5.25, r1=6.0, h=14.5, color='#e8832f', label='5-gal bucket, 12 in dia × 14.5 in'),
-    'Pallet (48 × 40 in)': dict(kind='box', size=(48.0, 40.0, 5.5), color='#b98a55', label='GMA pallet, 48 × 40 × 5.5 in'),
+    'Soda can (12 oz)': dict(kind='cyl', r0=1.30, r1=1.30, h=4.83, color='#d9453d', label='12 oz can, 2.6 in dia × 4.83 in', metric='355 mL can, 66 mm dia × 123 mm'),
+    '5-gallon bucket': dict(kind='cyl', r0=5.25, r1=6.0, h=14.5, color='#e8832f', label='5-gal bucket, 12 in dia × 14.5 in', metric='19 L bucket, 305 mm dia × 368 mm'),
+    'Pallet (48 × 40 in)': dict(kind='box', size=(48.0, 40.0, 5.5), color='#b98a55', label='GMA pallet, 48 × 40 × 5.5 in', metric='GMA pallet, 1219 × 1016 × 140 mm'),
     'None': None,
 }
 VIEWS = ['Reservoir', 'Drip pan', 'Drip rail']
-STEEL = {'Carbon steel': '#7d8da1', 'Stainless steel': '#c4ccd6'}
+STEEL = {m: d['color'] for m, d in tank.MATERIAL_DATA.items()}
 
 
 def _mix(a, b, t):
@@ -56,7 +56,7 @@ def build_scene(view, v, reference='Soda can (12 oz)'):
             parts.append(box((0, 0, 0), (L, W, vt), col))
             parts += _ring(L, W, vt, H - vt, vt, col)
         extent = (L, W, H)
-        caption = 'Reservoir  %s × %s × %s in  ·  %s' % (_n(L), _n(W), _n(H), v['tank_mat'])
+        caption = 'Reservoir  %s × %s × %s %s  ·  %s' % (_n(L), _n(W), _n(H), _u(), v['tank_mat'])
     elif view == 'Drip pan':
         L, W = v['pan_l'], v['pan_w']
         big = max(L, W)
@@ -71,8 +71,9 @@ def build_scene(view, v, reference='Soda can (12 oz)'):
         ox, oy = (L - tl) / 2, (W - tw_) / 2
         parts.append(box((ox, oy, vp), (ox + tl, oy + tw_, vp + th), '#4aa3ff', 0.16))
         extent = (L, W, max(vp + (v['rail_h'] if v['rail_on'] else 0), vp + th))
-        caption = 'Drip pan  %s × %s in%s  ·  %s  (blue = reservoir footprint)' % (
-            _n(L), _n(W), ('  ·  %s in rail' % _n(v['rail_h'])) if v['rail_on'] else '  ·  no rail', v['pan_mat'])
+        caption = 'Drip pan  %s × %s %s%s  ·  %s  (blue = reservoir footprint)' % (
+            _n(L), _n(W), _u(), ('  ·  %s %s rail' % (_n(v['rail_h']), _u())) if v['rail_on'] else '  ·  no rail',
+            v['pan_mat'])
     else:                                                        # Drip rail
         if not v['rail_on']:
             return [], 'Drip rail is switched off. Tick “Drip rail” to preview it.'
@@ -82,7 +83,7 @@ def build_scene(view, v, reference='Soda can (12 oz)'):
         vr = min(_vis(v['t_rail'], big), min(L, W) / 4)
         parts += _ring(L, W, vr, v['rail_h'], 0, col)
         extent = (L, W, v['rail_h'])
-        caption = 'Drip rail  %s × %s in  ·  %s in tall  ·  %s' % (_n(L), _n(W), _n(v['rail_h']), v['pan_mat'])
+        caption = 'Drip rail  %s × %s %s  ·  %s %s tall  ·  %s' % (_n(L), _n(W), _u(), _n(v['rail_h']), _u(), v['pan_mat'])
 
     ref = REFERENCES.get(reference)
     if ref:
@@ -93,14 +94,21 @@ def build_scene(view, v, reference='Soda can (12 oz)'):
         else:
             sx, sy, sz = ref['size']
             parts.append(box((extent[0] + gap, 0, 0), (extent[0] + gap + sx, sy, sz), ref['color']))
-        ref_label = ref['label']
+        ref_label = ref['metric'] if units.metric() else ref['label']
     if ref_label:
         caption += '   |   Reference: ' + ref_label
     return parts, caption
 
 
 def _n(x):
+    if units.metric():
+        x *= 25.4
+        return ('%.0f' % x) if x >= 100 else ('%.1f' % x).rstrip('0').rstrip('.')
     return ('%.2f' % x).rstrip('0').rstrip('.')
+
+
+def _u():
+    return 'mm' if units.metric() else 'in'
 
 
 # --------------------------------------------------------------------------- geometry -> polygons

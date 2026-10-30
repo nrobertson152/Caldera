@@ -79,7 +79,10 @@ def project_blocks(name, notes, rows):
         blocks.append(('Project notes', notes))
     for r in rows:
         head = '%s   ·   %s' % (r.get('tool', ''), str(r.get('date', '')).replace('T', ' '))
-        blocks.append((head, r.get('result', '')))
+        body = str(r.get('result', ''))
+        if str(r.get('note', '')).strip():
+            body += '\n\nNote: ' + str(r['note']).strip()
+        blocks.append((head, body))
     if not rows:
         blocks.append(('', 'No calculations have been saved to this project yet.'))
     return blocks
@@ -88,10 +91,10 @@ def project_blocks(name, notes, rows):
 def write_history_csv(path, rows):
     with open(path, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
-        w.writerow(['Date', 'Project', 'Tool', 'Inputs', 'Result', 'Pinned'])
+        w.writerow(['Date', 'Project', 'Tool', 'Inputs', 'Result', 'Note', 'Pinned'])
         for r in rows:
             w.writerow([r.get('date'), r.get('project'), r.get('tool'), json.dumps(r.get('inputs')),
-                        r.get('result'), bool(r.get('pinned'))])
+                        r.get('result'), r.get('note', ''), bool(r.get('pinned'))])
 
 
 def write_history_xlsx(path, rows):
@@ -100,14 +103,14 @@ def write_history_xlsx(path, rows):
     wb = Workbook()
     ws = wb.active
     ws.title = 'Calculation History'
-    ws.append(['Date', 'Project', 'Tool', 'Inputs', 'Result', 'Pinned'])
+    ws.append(['Date', 'Project', 'Tool', 'Inputs', 'Result', 'Note', 'Pinned'])
     for cell in ws[1]:
         cell.font = Font(bold=True, color='FFFFFF')
         cell.fill = PatternFill('solid', fgColor='1B222C')
     for r in rows:
         ws.append([r.get('date'), r.get('project'), r.get('tool'), json.dumps(r.get('inputs')),
-                   str(r.get('result')), bool(r.get('pinned'))])
-    for col, width in zip('ABCDEF', (20, 16, 32, 40, 60, 8)):
+                   str(r.get('result')), str(r.get('note', '')), bool(r.get('pinned'))])
+    for col, width in zip('ABCDEFG', (20, 16, 32, 40, 60, 40, 8)):
         ws.column_dimensions[col].width = width
     for row in ws.iter_rows(min_row=2):
         for cell in row:

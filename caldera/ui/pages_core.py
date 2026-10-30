@@ -2,13 +2,14 @@
 from datetime import datetime
 
 from PySide6.QtCore import QPoint, QTimer, Qt
-from PySide6.QtWidgets import (QApplication, QBoxLayout, QGridLayout, QMenu, QTableWidget, QTableWidgetItem,
-                               QWidget, QFrame)
+from PySide6.QtWidgets import (QApplication, QBoxLayout, QGridLayout, QMenu, QPlainTextEdit, QTableWidget,
+                               QTableWidgetItem, QWidget, QFrame)
 from PySide6.QtGui import QColor
 
+from .. import units
 from ..registry import TOOLS
-from ..toolmeta import (CATEGORIES, FORMULAS, NOTES, DEFAULT_NOTE, blurb_of, category_of, evaluate, format_metric,
-                        icon_of, is_toggle, parse_number, split_label, sweep_all)
+from ..toolmeta import (CATEGORIES, CHOICE_ALIASES, FORMULAS, NOTES, DEFAULT_NOTE, blurb_of, category_of, evaluate,
+                        format_metric, icon_of, is_toggle, parse_number, split_label, status_kind, sweep_all)
 from . import icons
 from .kit import (ClickRow, IconTile, ago, fit_table_height, page_header, section_title, stat_card, tool_card)
 from .theme import current as T
@@ -124,7 +125,7 @@ class CalculatorPage(ScrollPage):
         self.win, self.name = win, name
         self.specs, self.fn = TOOLS[name]
         self.inputs = []
-        self.result = None
+        self.result = self.canon = None
         self._result_widget = None
         self._sweeps, self._chart_inputs = {}, []
         t = T()
@@ -190,6 +191,16 @@ class CalculatorPage(ScrollPage):
         self.result_lay = vbox(host, (0, 0, 0, 0), 0)
         right.addWidget(host)
 
+        notes = Card(padding=18, spacing=8)
+        notes.body.addWidget(section_title('Notes', 'saved with the result'))
+        self.note_edit = QPlainTextEdit(win.data.get('note_drafts', {}).get(name, ''))
+        self.note_edit.setPlaceholderText('Customer, job number, assumptions, why these inputs… '
+                                          '“Save to project” stores this note with the result.')
+        self.note_edit.setFixedHeight(84)
+        self.note_edit.textChanged.connect(self._note_changed)
+        notes.body.addWidget(self.note_edit)
+        right.addWidget(notes)
+
         self.chart_card = Card(padding=20, spacing=12)
         self.chart_card.body.addWidget(section_title('Sensitivity', 'where the result curves as one input changes ±50 %'))
         ctl = hbox(None, (0, 0, 0, 0), 10)
@@ -218,17 +229,22 @@ class CalculatorPage(ScrollPage):
             w.toggled.connect(lambda _b: self.schedule())
             caption = None
         elif isinstance(default, list):
-            w = Combo(default)
-            w.setCurrentText(draft[i] if have and draft[i] in default else str(getattr(default, 'default', None) or default[0]))
-            w.currentTextChanged.connect(lambda _t: self.schedule())
+            w = Combo(default, self.choice_labels(i, default))
+            saved = CHOICE_ALIASES.get(draft[i], draft[i]) if have else None
+            w.set_value(saved if saved in default else str(getattr(default, 'default', None) or default[0]))
+            w.currentIndexChanged.connect(lambda _i: self.schedule())
             caption = lbl
         else:
             nm, unit = split_label(lbl)
-            w = Field(draft[i] if have else default, unit)
+            w = Field(draft[i] if have else default, unit, quantity=(nm, unit))
             w.changed.connect(self.schedule)
             caption = nm
         self.inputs.append(w)
         return caption, w
+
+    def choice_labels(self, i, default):
+        """Hook: visible labels for a choice input (None = show the stored values as-is)."""
+        return None
 
     def input_cell(self, i, lbl, default, draft):
         wrap = QWidget()
@@ -294,8 +310,9 @@ class CalculatorPage(ScrollPage):
                     w.set_invalid(False)
                 except ValueError:
                     w.set_invalid(True)
-        res = evaluate(self.name, self.fn, self.specs, values, self.win.precision)
-        self.result = res
+        canon = evaluate(self.name, self.fn, self.specs, values, self.win.precision)
+        self.canon = canon
+        self.result = res = units.localize_result(canon)
         self.save_btn.setEnabled(not res.error)
         self.copy_btn.setEnabled(not res.error)
         new = self._build_result(res)
@@ -305,7 +322,7 @@ class CalculatorPage(ScrollPage):
             self._result_widget.setParent(None)
             self._result_widget.deleteLater()
         self._result_widget = new
-        self._refresh_chart(res, values)
+        self._refresh_chart(canon, values)
         self.after_recalc()
 
     def _build_result(self, res):
@@ -317,7 +334,7 @@ class CalculatorPage(ScrollPage):
             lay.addWidget(Banner('bad', res.error))
             return w
         for ok, text in res.status:
-            lay.addWidget(Banner('good' if ok else 'bad', text))
+            lay.addWidget(Banner(status_kind(ok), text))
         if res.metrics:
             hero = res.metrics[res.hero]
             lay.addWidget(HeroMetric(hero.label, format_metric(hero, p), hero.unit, icon_of(self.name)))
@@ -341,6 +358,8 @@ class CalculatorPage(ScrollPage):
             table = QTableWidget(len(rows), len(headers))
             table.setHorizontalHeaderLabels(headers)
             style_table(table, 40)
+            head = table.horizontalHeader()
+            head.setSectionResizeMode(0, head.ResizeMode.ResizeToContents)
             table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
             for r, row in enumerate(rows):
@@ -386,38 +405,50 @@ class CalculatorPage(ScrollPage):
         if idx is None:
             return
         keys = self._sweeps[idx]['nonlinear']
-        previous = self.out_combo.currentText()
-        hero = self.result.metrics[self.result.hero] if self.result and self.result.metrics else None
+        canon = self.canon
+        hero = canon.metrics[canon.hero] if canon and canon.metrics else None
         hero_key = '%s (%s)' % (hero.label, hero.unit) if hero and hero.unit else (hero.label if hero else '')
+        previous = self.out_combo.value() if self.out_combo.count() else ''
         self.out_combo.blockSignals(True)
         self.out_combo.clear()
-        self.out_combo.addItems(keys)
-        self.out_combo.setCurrentText(previous if previous in keys else (hero_key if hero_key in keys else keys[0]))
+        for k in keys:
+            self.out_combo.addItem(self._display_key(k), k)
+        self.out_combo.set_value(previous if previous in keys else (hero_key if hero_key in keys else keys[0]))
         self.out_combo.blockSignals(False)
 
     def _on_in_changed(self):
         self._fill_outputs()
         self.update_chart()
 
+    @staticmethod
+    def _display_key(key):
+        nm, unit = split_label(key)
+        return '%s (%s)' % (nm, units.display_unit(nm, unit)) if unit else nm
+
     def update_chart(self):
         idx = self._selected_input()
-        if idx is None or self.result is None or self.result.error:
+        if idx is None or self.canon is None or self.canon.error:
             return
-        key = self.out_combo.currentText()
+        key = self.out_combo.value()
         sweep = self._sweeps.get(idx)
         if not sweep or key not in sweep['series']:
             return
-        xlabel = self.in_combo.currentText()
         try:
             v0 = parse_number(self.values()[idx])
         except ValueError:
             return
         cur = None
-        for m in self.result.metrics:
+        for m in self.canon.metrics:
             if m.kind == 'num' and ('%s (%s)' % (m.label, m.unit) if m.unit else m.label) == key:
                 cur = m.value
-        self.chart.set_data(sweep['xs'], sweep['series'][key], (v0, cur) if cur is not None else None, xlabel, key,
-                            self.win.precision)
+        in_name, in_unit = split_label(self.specs[idx][0])
+        out_name, out_unit = split_label(key)
+        xs = [units.to_display(in_name, in_unit, x) for x in sweep['xs']]
+        ys = [units.to_display(out_name, out_unit, y) for y in sweep['series'][key]]
+        if cur is not None:
+            cur = (units.to_display(in_name, in_unit, v0), units.to_display(out_name, out_unit, cur))
+        xlabel = self._display_key(self.specs[idx][0])
+        self.chart.set_data(xs, ys, cur, xlabel, self._display_key(key), self.win.precision)
 
     # ------------------------------------------------------------------ actions
     def commit(self):
@@ -432,10 +463,14 @@ class CalculatorPage(ScrollPage):
     def result_text(self):
         return self.result.as_text(self.win.precision) if self.result and not self.result.error else ''
 
+    def _note_changed(self):
+        self.win.data.setdefault('note_drafts', {})[self.name] = self.note_edit.toPlainText()
+        self.win.schedule_save()
+
     def save_result(self):
         text = self.result_text()
         if text:
-            self.win.add_history(self.name, self.values(), text)
+            self.win.add_history(self.name, self.values(), text, self.note_edit.toPlainText())
 
     def copy_result(self):
         text = self.result_text()
@@ -492,6 +527,12 @@ class CalculatorPage(ScrollPage):
 
 
 def calculator_page(win, name):
+    if name == 'Conduit Fill':
+        from .page_conduit import ConduitPage
+        return ConduitPage(win, name)
+    if name == 'Hydraulic Cylinder Cycle Time':
+        from .page_cylinder import CylinderCyclePage
+        return CylinderCyclePage(win, name)
     if name == 'Reservoir / Drip Pan':
         from .page_tank import ReservoirPage     # imported here: page_tank subclasses CalculatorPage
         return ReservoirPage(win, name)

@@ -5,6 +5,43 @@ All notable changes to Caldera are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-30
+
+### Added
+- **Metric / US customary units.** A setting (Settings → Calculations, or the command palette) switches every
+  calculator's inputs, results, charts and 3D captions between US customary and metric. Calculations, drafts,
+  presets and saved inputs stay in US customary internally, so nothing already saved changes.
+- **Notes on calculations.** Every calculator has a Notes box; "Save to project" stores the note with the result.
+  Notes can be edited in History, are searchable, appear in Compare and are included in CSV, Excel and PDF exports.
+- **Reservoir / Drip Pan safety checks**: zero or small air gap, a pan that cannot contain the tank's oil, less than
+  110 % containment, no drip rail, tank not fitting the rail, tight clearance, shallow oil, open top, thin walls on
+  tall tanks, thin aluminum, aluminum touching steel (galvanic corrosion) and very heavy assemblies.
+- **Hydraulic Cylinder Cycle Time animation**: a play / pause button animates the cylinder extending and retracting
+  at the calculated times, with ¼× to 5× speed, loop and a timeline.
+- **Line Velocity recommendations**: choose suction, return or pressure line to see the recommended velocity range
+  (Parker nomograph), a pass / warning verdict, the smallest inside diameter and hose dash size, and a table for every
+  line type.
+- **Compare Calculations** now takes up to three results, with changes shown relative to A.
+- **Seal Compatibility**: 12 fluid families (mineral, HFA/HFB, HFC, HFDR, HFDU, HETG, HEES, HEPG, HEPR, water,
+  diesel, brake fluid) and 12 materials, plus an all-fluids matrix, a material guide (temperature range, hardness,
+  strengths, weaknesses) and selection tips.
+- **Reference Tables**: sections for conversions (many more), fraction / decimal / mm, hydraulic (line velocity,
+  hose dash sizes and JIC / SAE ORB threads, ISO VG grades, ISO 4406 cleanliness targets), electrical (NEC motor
+  full-load amps, copper ampacity), pipe dimensions, bolt torque and handy formulas.
+
+### Changed
+- **Reservoir / Drip Pan materials and thickness.** Seven materials: carbon steel (A36), HSLA steel (A572 Gr 50),
+  galvanized steel (G90), stainless 304 and 316, aluminum 5052-H32 and 6061-T6. Thickness can be a gauge (28 to 7 ga)
+  or plate (1/8", 3/16", 1/4", 5/16", 3/8", 1/2"). Gauges use each material's own standard, and every option shows its
+  real thickness for the chosen material.
+- **Conduit Fill** rebuilt: list any mix of conductor sizes and insulations (THHN/THWN-2, XHHW, THW, bare copper or a
+  custom area), pick a conduit type (EMT, RMC, IMC, PVC 40/80, FMC, LFMC), and get the NEC fill limit (53 / 31 / 40 %,
+  60 % nipples), the recommended trade size, and the smallest size for every conduit type.
+- **Charts**: axis numbers use compact labels (1.2k, 45k, 3.5M) so large values are no longer cut off, the left margin
+  fits the widest label, and the y-axis has a title.
+- About page: the GPL button uses a licence icon instead of the Caldera logo (and shows the official GNU artwork if
+  `caldera/assets/gnu.svg` is added).
+
 ## [1.0.1] - 2026-10-30
 
 ### Fixed

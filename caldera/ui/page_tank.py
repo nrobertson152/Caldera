@@ -9,6 +9,7 @@ from .kit import section_title
 from .widgets import Card, Combo, Segmented, Tick, eyebrow, hbox, label
 
 # (title, color key, first spec index, one-past-last spec index)
+THICKNESS_OF = {3: 4, 9: 10, 12: 10}          # thickness input -> the material input it depends on
 SECTIONS = [('Reservoir', 'Hydraulic', 0, 7), ('Drip pan', 'Mechanical', 7, 11), ('Drip rail', 'Electrical', 11, 14)]
 
 
@@ -41,6 +42,15 @@ class ReservoirPage(CalculatorPage):
         self.rail_tick = self.inputs[11]
         self.rail_tick.toggled.connect(lambda _b: self._sync_rail())
         self._sync_rail()
+        for j in set(THICKNESS_OF.values()):
+            self.inputs[j].currentIndexChanged.connect(lambda _i: self._relabel_thickness())
+        self._relabel_thickness()
+
+    def _relabel_thickness(self):
+        """Gauge thickness depends on the material, so show each option's real thickness for the chosen material."""
+        for i, j in THICKNESS_OF.items():
+            mat = self.inputs[j].value()
+            self.inputs[i].relabel(lambda size, m=mat: tank.thickness_caption(m, size))
 
     def _sync_rail(self):
         on = self.rail_tick.isChecked()
@@ -94,6 +104,10 @@ class ReservoirPage(CalculatorPage):
             self.viewer.set_message(str(e))
             return
         parts, caption = model3d.build_scene(self.view, v, self.ref)
+        if self.canon and not self.canon.error:
+            bad = [text for ok, text in self.canon.status if ok == 'bad']
+            if bad:
+                caption = '⚠ %d problem%s  ·  %s' % (len(bad), '' if len(bad) == 1 else 's', caption)
         if parts:
             self.viewer.set_scene(parts, caption)
         else:

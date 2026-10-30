@@ -27,6 +27,18 @@ def is_toggle(default):
     return isinstance(default, Choice) and getattr(default, 'toggle', False)
 
 
+# choice values renamed in later versions -> current value (so old drafts / history re-open correctly)
+CHOICE_ALIASES = {'Carbon steel': 'Carbon steel (A36)', 'Stainless steel': 'Stainless 304'}
+
+
+class Text(str):
+    """A free-text calculator input (passed to the calculator as-is, never parsed as a number or swept)."""
+
+
+def is_text(default):
+    return isinstance(default, Text)
+
+
 # --------------------------------------------------------------------------- navigation model
 CATEGORIES = {
     'Hydraulic': ['Hydraulic Pump & Motor', 'Hydraulic Motor', 'Hydraulic Power & Efficiency', 'Hydraulic Cylinder',
@@ -60,16 +72,16 @@ META = {
     'Hydraulic Cylinder Cycle Time': ('timer', 'Extend and retract time from bore, rod, stroke and flow.'),
     'Pneumatic Air Consumption': ('wind', 'Free-air demand of a double-acting cylinder in SCFM.'),
     'Torque, RPM & Power': ('cog', 'Convert between torque, speed and power.'),
-    'Reservoir / Drip Pan': ('tank', 'Size a steel reservoir and drip pan: oil capacity, air gap, weight and a 3D preview.'),
+    'Reservoir / Drip Pan': ('tank', 'Size a steel, stainless or aluminum reservoir and drip pan: capacity, containment, weight, safety checks and a 3D preview.'),
     'Wire Gauge & Voltage Drop': ('cable', 'Conductor sizes that stay inside a voltage-drop budget.'),
-    'Conduit Fill': ('conduit', 'Conductor area against allowable conduit fill.'),
+    'Conduit Fill': ('conduit', 'Mixed conductor sizes in one raceway: fill %, code limit and the smallest conduit that fits.'),
     'Hydraulic Cylinder': ('cylinder', 'Push / pull force and stroke times.'),
     'Hydraulic Motor': ('cog', 'Output torque, flow demand and power.'),
     'Heat Load & Cooler Sizing': ('flame', 'System heat load and a cooler target.'),
     'Hydraulic Accumulator': ('tank', 'Gas volume for a required usable discharge.'),
     'Pneumatic Cylinder': ('cylinder', 'Force and stroke time for a pneumatic cylinder.'),
     'Compressed Air Horsepower': ('wind', 'Idealized isothermal compressor input power.'),
-    'Line Velocity': ('flow', 'Fluid velocity from flow and inside diameter.'),
+    'Line Velocity': ('flow', 'Fluid velocity, recommended ranges for suction, return and pressure lines, and hose size.'),
     'Pressure Drop Calculator': ('activity', 'Darcy–Weisbach pressure drop with flow-regime detection.'),
     'Orifice Flow Estimate': ('funnel', 'Flow through a sharp-edged orifice.'),
     'Labor Savings': ('timer', 'Hours and cost saved by a faster cycle.'),
@@ -95,13 +107,16 @@ FORMULAS = {
     'Pneumatic Air Consumption': ['V_swept (ft³) = π/4 × (2b² − r²) × stroke / 1728',
                                   'V_free = V_swept × (P_gauge + P_atm) / P_atm', 'SCFM = V_free × cycles/min'],
     'Torque, RPM & Power': ['HP = T (lb·ft) × 2π × RPM / (60 × 550)', 'kW = HP × 0.745700', 'N·m = lb·ft × 1.355818'],
-    'Reservoir / Drip Pan': ['t = sheet thickness from gauge (carbon and stainless tables differ)',
+    'Reservoir / Drip Pan': ['t = plate size, or gauge looked up in the material’s own gauge standard',
                              'V_internal = (L − 2t)(W − 2t)(H − 2t)      (one t less in height if open top)',
                              'Oil = V_internal × fill %        Air gap = V_internal − Oil',
-                             'Shell weight = (V_outer − V_internal) × ρ      ρ = 0.284 (carbon) / 0.289 (stainless) lb/in³',
+                             'Shell weight = (V_outer − V_internal) × ρ      ρ = 0.284 steel / 0.289 stainless / 0.097 aluminum lb/in³',
                              'Pan weight = L × W × t × ρ      Rail weight = (L·W − (L−2t_r)(W−2t_r)) × h × ρ',
                              'Pan capacity = (L−2t_r)(W−2t_r) × h / 231      Net = (pan area − tank footprint) × h / 231'],
-    'Conduit Fill': ['Fill % = n × A_conductor / A_conduit × 100'],
+    'Conduit Fill': ['Fill % = Σ (n × A_conductor) / A_conduit × 100',
+                     'Limit: 53 % (1 conductor), 31 % (2), 40 % (3 or more), 60 % for a nipple ≤ 24 in',
+                     'Recommended = smallest trade size with Σ A ≤ A_conduit × limit',
+                     'A_conductor: NEC Ch. 9 Table 5 / 8      A_conduit: NEC Ch. 9 Table 4'],
     'Hydraulic Cylinder': ['F = P × A', 'A_cap = π b² / 4        A_ann = π (b² − r²) / 4', 't = A × stroke / 231 / Q × 60'],
     'Hydraulic Motor': ['T (lb·ft) = P × D / (2π) × η_mech / 12', 'Q = D × n / 3785.41 / η_vol',
                         'HP_out = P × D × n / 3785.41 / 1714 × η_mech'],
@@ -110,7 +125,9 @@ FORMULAS = {
     'Hydraulic Accumulator': ['V₀ = ΔV / [ (P₀/P₁)^(1/n) − (P₀/P₂)^(1/n) ]', 'Pressures absolute; P₀ < P₁ < P₂'],
     'Pneumatic Cylinder': ['F = P × A', 't = A × stroke / 1728 / CFM × 60'],
     'Compressed Air Horsepower': ['P_iso = P₁ × Q₁ × ln(P₂ / P₁)', 'P_input = P_iso / η'],
-    'Line Velocity': ['v (in/s) = Q × 231 / 60 / (π d² / 4)', 'v (ft/s) = v / 12'],
+    'Line Velocity': ['v (ft/s) = 0.3208 × Q (GPM) / A (in²)        A = π d² / 4',
+                      'd_min = √(4 × 0.3208 × Q / (v_max × π))',
+                      'v_max: suction 4, return 15, pressure 20 (25 above 3,000 PSI) ft/s'],
     'Pressure Drop Calculator': ['Re = v D / ν', 'f = 64 / Re   (laminar, Re < 2300)',
                                  'f = 0.25 / [log₁₀(ε / 3.7D + 5.74 / Re^0.9)]²   (Swamee–Jain)',
                                  'ΔP = f × (L / D) × ρ v² / 2'],
@@ -210,6 +227,7 @@ class Result:
         self.metrics = []
         self.status = []        # [(ok: bool, text)]
         self.table = None       # (headers, rows)
+        self.table_units = None  # optional US unit per table column, for metric display
         self.notes = []
         self.hero = 0
         self.sweepable = True
@@ -225,7 +243,10 @@ class Result:
             name = '%s (%s)' % (m.label, m.unit) if m.unit else m.label
             lines.append('%s: %s' % (name, format_metric(m, precision)))
         for ok, text in self.status:
-            lines.append('%s: %s' % (text, 'Yes' if ok else 'No'))
+            if isinstance(ok, str):
+                lines.append('%s: %s' % (CHECK_WORDS.get(ok, 'Note'), text))
+            else:
+                lines.append('%s: %s' % (text, 'Yes' if ok else 'No'))
         if self.table:
             headers, rows = self.table
             lines.append('')
@@ -253,6 +274,35 @@ def fmt_num(v, precision=3):
     if '.' in text:
         text = text.rstrip('0').rstrip('.')
     return text
+
+
+def fmt_compact(v):
+    """Short axis label: 950, 1.2k, 45k, 3.5M, 1.2B. Small values keep up to 3 significant digits."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or math.isnan(v) or math.isinf(v):
+        return fmt_num(v)
+    a = abs(v)
+    if a < 1e-12:
+        return '0'
+    for div, suffix in ((1e12, 'T'), (1e9, 'B'), (1e6, 'M'), (1e3, 'k'), (1, '')):
+        if a >= div * 0.9995:
+            x = v / div
+            text = ('%.3g' % x) if abs(x) < 1000 else '%.0f' % x
+            if 'e' in text:
+                text = '%.0f' % x
+            if suffix and text.lstrip('-') == '1000' and div < 1e12:
+                continue
+            return text + suffix
+    return '%.3g' % v
+
+
+CHECK_WORDS = {'good': 'OK', 'warn': 'Warning', 'bad': 'Problem'}
+
+
+def status_kind(ok):
+    """Banner kind for a Result.status entry: bools from calculators, or an explicit 'good' / 'warn' / 'bad'."""
+    if isinstance(ok, str):
+        return ok if ok in CHECK_WORDS else 'warn'
+    return 'good' if ok else 'bad'
 
 
 def format_metric(m, precision=3):
@@ -285,15 +335,23 @@ _BOOL_TEXT = {
 _HERO = {'Cylinder Buckling': 'allowable_lbf', 'Hydraulic Cylinder Cycle Time': 'cycle_sec',
          'Hydraulic Cylinder': 'Extend force (lbf)', 'Pneumatic Cylinder': 'Extend force (lbf)',
          'Pressure Drop Calculator': 'Pressure drop (PSI)', 'Torque, RPM & Power': 'hp',
-         'Reservoir / Drip Pan': 'Oil capacity at fill level (gal)'}
+         'Reservoir / Drip Pan': 'Oil capacity at fill level (gal)', 'Conduit Fill': 'Recommended size'}
 
 
 def _normalize_dict(name, raw):
     r = Result()
     hero_key = _HERO.get(name)
     r.notes.extend(raw.get('_notes', []))
+    for level, text in raw.get('_checks', []):
+        r.status.append((level, text))
+    if raw.get('_table'):
+        tbl = raw['_table']
+        r.table = (list(tbl[0]), [list(row) for row in tbl[1]])
+        r.table_units = list(tbl[2]) if len(tbl) > 2 else None
+    if raw.get('_sweepable') is False:
+        r.sweepable = False
     for i, (key, value) in enumerate(raw.items()):
-        if key == '_notes':
+        if key.startswith('_'):
             continue
         if key in _LEGACY:
             label, unit = _LEGACY[key]
@@ -309,6 +367,8 @@ def _normalize_dict(name, raw):
                 r.hero = len(r.metrics) - 1
         else:
             r.metrics.append(Metric(label, value, unit, 'text'))
+            if hero_key is not None and key == hero_key:
+                r.hero = len(r.metrics) - 1
     return r
 
 
@@ -342,7 +402,9 @@ def evaluate(name, fn, specs, values, precision=3):
     r = Result()
     args = []
     for (label, default), value in zip(specs, values):
-        if isinstance(default, list):
+        if is_text(default):
+            args.append(str(value))
+        elif isinstance(default, list):
             try:
                 args.append(float(value))
             except ValueError:
@@ -397,7 +459,7 @@ def sweep_all(name, fn, specs, values, points=SWEEP_POINTS):
     Outputs that are straight lines of the swept input are left out of 'nonlinear' (not worth charting)."""
     out = {}
     for idx, (_label, default) in enumerate(specs):
-        if isinstance(default, list) or idx >= len(values):
+        if isinstance(default, list) or is_text(default) or idx >= len(values):
             continue
         try:
             v0 = parse_number(values[idx])

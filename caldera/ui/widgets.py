@@ -9,7 +9,8 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFrame, QGraphicsOpacityEffect, QHBoxLayout, QHeaderView,
                                QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
-from ..toolmeta import fmt_num, parse_number
+from .. import units
+from ..toolmeta import fmt_compact, fmt_num, parse_number
 from . import icons
 from .theme import current as T, mix
 
@@ -206,11 +207,39 @@ class Pill(QLabel):
 class Combo(QComboBox):
     """Combo box that ignores the mouse wheel unless focused, so scrolling a page never changes a value."""
 
-    def __init__(self, items=()):
+    def __init__(self, items=(), labels=None):
         super().__init__()
-        self.addItems(list(items))
+        items = list(items)
+        if labels is None:
+            self.addItems(items)
+        else:
+            for value, text in zip(items, labels):
+                self.addItem(str(text), value)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def value(self):
+        """The stored value of the current item (its data when it has one, else its text)."""
+        data = self.currentData()
+        return self.currentText() if data is None else str(data)
+
+    def set_value(self, value):
+        i = self.findData(value)
+        if i < 0:
+            i = self.findText(str(value))
+        if i >= 0:
+            self.setCurrentIndex(i)
+
+    def relabel(self, fn):
+        """Change the visible text of every item to fn(value) without changing values or emitting signals."""
+        self.blockSignals(True)
+        for i in range(self.count()):
+            data = self.itemData(i)
+            value = self.itemText(i) if data is None else data
+            if data is None:
+                self.setItemData(i, value)
+            self.setItemText(i, fn(value))
+        self.blockSignals(False)
 
     def wheelEvent(self, ev):
         if self.hasFocus():
@@ -223,13 +252,20 @@ class Field(QFrame):
     """Numeric/text input with an inline unit. ↑/↓ step the value (Shift = ×10)."""
     changed = Signal()
 
-    def __init__(self, text='', unit='', numeric=True):
+    def __init__(self, text='', unit='', numeric=True, quantity=None):
+        """`quantity` = (name, US unit) makes the field unit-aware: it shows and accepts the active unit system but
+        value() / set_value() always speak US customary (what the calculators use)."""
         super().__init__()
         self.setObjectName('field')
         self.numeric = numeric
+        self._q = tuple(quantity) if quantity and units.convertible(*quantity) else None
+        self._shown = None
+        if self._q:
+            unit = units.display_unit(*self._q)
         self.setFixedHeight(40)
         lay = hbox(self, (12, 0, 12, 0), 8)
-        self.edit = QLineEdit(str(text))
+        self.edit = QLineEdit()
+        self.set_value(text)
         self.edit.setFrame(False)
         self.edit.textChanged.connect(lambda _t: self.changed.emit())
         self.edit.installEventFilter(self)
@@ -246,6 +282,30 @@ class Field(QFrame):
 
     def setText(self, value):
         self.edit.setText(str(value))
+
+    def set_value(self, canonical):
+        """Show a US-customary value (converted for display when the field is unit-aware)."""
+        if not self._q:
+            self.edit.setText(str(canonical))
+            return
+        try:
+            shown = units.num_text(units.to_display(*self._q, parse_number(canonical)))
+        except ValueError:
+            shown = str(canonical)
+        self._shown = (shown, str(canonical))
+        self.edit.setText(shown)
+
+    def value(self):
+        """The field's value in US customary units (text as typed when it does not parse)."""
+        text = self.edit.text()
+        if not self._q:
+            return text
+        if self._shown and text == self._shown[0]:
+            return self._shown[1]
+        try:
+            return '%.12g' % units.to_canonical(*self._q, parse_number(text))
+        except ValueError:
+            return text
 
     def _flag(self, prop, value):
         if self.property(prop) == value:
@@ -394,16 +454,24 @@ def get_value(w):
     """The string a calculator input currently holds, whatever widget type it is."""
     if isinstance(w, Tick):
         return 'Yes' if w.isChecked() else 'No'
+    if isinstance(w, Combo):
+        return w.value()
     if isinstance(w, QComboBox):
         return w.currentText()
+    if hasattr(w, 'value') and callable(w.value):
+        return w.value()
     return w.text()
 
 
 def set_value(w, value):
     if isinstance(w, Tick):
         w.setChecked(str(value) == 'Yes')
+    elif isinstance(w, Combo):
+        w.set_value(value)
     elif isinstance(w, QComboBox):
         w.setCurrentText(str(value))
+    elif hasattr(w, 'set_value') and callable(w.set_value):
+        w.set_value(value)
     else:
         w.setText(str(value))
 
@@ -477,8 +545,10 @@ class SweepChart(QWidget):
         self.update()
 
     # layout helpers
+    _left = 64
+
     def _plot(self):
-        return QRectF(58, 12, max(self.width() - 58 - 16, 10), max(self.height() - 12 - 34, 10))
+        return QRectF(self._left, 12, max(self.width() - self._left - 16, 10), max(self.height() - 12 - 38, 10))
 
     def _bounds(self):
         x0, x1 = min(self.xs), max(self.xs)
@@ -514,6 +584,13 @@ class SweepChart(QWidget):
         self.update()
         super().leaveEvent(ev)
 
+    def _tick_labels(self, values):
+        """Compact (1.2k / 3.4M) tick labels; fall back to full numbers if compacting would make ticks look equal."""
+        out = [fmt_compact(v) for v in values]
+        if len(set(out)) < len(out):
+            out = [fmt_num(v, min(self._precision, 4)) for v in values]
+        return out
+
     def paintEvent(self, _ev):
         t = T()
         p = QPainter(self)
@@ -525,9 +602,13 @@ class SweepChart(QWidget):
             p.setPen(QColor(t['faint']))
             p.drawText(QRectF(self.rect()), Qt.AlignmentFlag.AlignCenter, 'Not enough valid points to plot.')
             return
-        r = self._plot()
         b = self._bounds()
         x0, x1, y0, y1 = b
+        ylabels = self._tick_labels([y0 + i / 4 * (y1 - y0) for i in range(5)])
+        xlabels = self._tick_labels([x0 + i / 4 * (x1 - x0) for i in range(5)])
+        fm = QFontMetrics(f)
+        self._left = 30 + max(fm.horizontalAdvance(text) for text in ylabels) + 8
+        r = self._plot()
         # grid + y labels
         for i in range(5):
             frac = i / 4
@@ -535,16 +616,22 @@ class SweepChart(QWidget):
             p.setPen(QPen(QColor(t['border']), 1, Qt.PenStyle.DotLine if 0 < i < 4 else Qt.PenStyle.SolidLine))
             p.drawLine(QPointF(r.left(), y), QPointF(r.right(), y))
             p.setPen(QColor(t['faint']))
-            p.drawText(QRectF(0, y - 8, r.left() - 8, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-                       fmt_num(y0 + frac * (y1 - y0), min(self._precision, 2)))
+            p.drawText(QRectF(26, y - 8, r.left() - 26 - 8, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                       ylabels[i])
         for i in range(5):
             frac = i / 4
             x = r.left() + frac * r.width()
             p.setPen(QColor(t['faint']))
-            p.drawText(QRectF(x - 40, r.bottom() + 6, 80, 14), Qt.AlignmentFlag.AlignCenter,
-                       fmt_num(x0 + frac * (x1 - x0), min(self._precision, 2)))
+            p.drawText(QRectF(x - 40, r.bottom() + 6, 80, 14), Qt.AlignmentFlag.AlignCenter, xlabels[i])
         p.setPen(QColor(t['muted']))
-        p.drawText(QRectF(r.left(), self.height() - 15, r.width(), 14), Qt.AlignmentFlag.AlignCenter, self.xlabel)
+        p.drawText(QRectF(r.left(), self.height() - 17, r.width(), 14), Qt.AlignmentFlag.AlignCenter, self.xlabel)
+        if self.ylabel:                                    # y-axis title, rotated along the left edge
+            p.save()
+            p.translate(13, r.center().y())
+            p.rotate(-90)
+            text = fm.elidedText(self.ylabel, Qt.TextElideMode.ElideRight, int(r.height()))
+            p.drawText(QRectF(-r.height() / 2, -8, r.height(), 16), Qt.AlignmentFlag.AlignCenter, text)
+            p.restore()
         # curve + fill
         pts = [self._map(x, y, b, r) for x, y in zip(self.xs, self.ys)]
         line = QPainterPath(pts[0])
@@ -585,7 +672,6 @@ class SweepChart(QWidget):
             p.setBrush(QColor(t['text']))
             p.drawEllipse(pt, 4, 4)
             text = '%s  →  %s' % (fmt_num(hx, self._precision), fmt_num(hy, self._precision))
-            fm = QFontMetrics(f)
             w = fm.horizontalAdvance(text) + 20
             bx = min(max(pt.x() - w / 2, r.left()), r.right() - w)
             by = pt.y() - 36 if pt.y() - 36 > r.top() else pt.y() + 12

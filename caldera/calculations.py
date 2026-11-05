@@ -19,10 +19,16 @@ def pump(d,rpm,psi,ve,me):
     gpm_theoretical=d*rpm/3785.411784; gpm=gpm_theoretical*ve/100; hp=psi*gpm/1714
     return {'Theoretical flow (GPM)':gpm_theoretical,'Actual flow (GPM)':gpm,'Hydraulic output (HP)':hp,'Shaft input (HP)':hp/(me/100)}
 
-def wire(amps,length,voltage,maxdrop,material,temp):
+CIRCUITS=['DC / single-phase','Three-phase']
+
+def wire(amps,length,voltage,maxdrop,material,temp,circuit='DC / single-phase'):
+    """Voltage drop per conductor size. DC and single-phase: V = 2 × I × L × R (out and back). Balanced
+    three-phase, line to line: V = √3 × I × L × R."""
     if amps<=0 or length<0 or voltage<=0 or not 0<maxdrop<=100:raise ValueError('Check current, length, voltage, and maximum drop.')
+    if circuit not in CIRCUITS:raise ValueError('Choose DC / single-phase or three-phase.')
     awg=[('18',6.385),('16',4.016),('14',2.525),('12',1.588),('10',0.999),('8',0.6282),('6',0.3951),('4',0.2485),('3',0.197),('2',0.1563),('1',0.1239),('1/0',0.0983),('2/0',0.0779),('3/0',0.0618),('4/0',0.049)]
     factor=(1 if material=='Copper' else 1.64)*(1+0.00393*(temp-20))
-    rows=[(g,amps*2*length*r*factor/1000) for g,r in awg]
+    path=math.sqrt(3) if circuit=='Three-phase' else 2
+    rows=[(g,amps*path*length*r*factor/1000) for g,r in awg]
     eligible=[(g,d) for g,d in rows if d/voltage*100<=maxdrop]
-    return 'Allowed voltage drop: {:.4f} V\n\n{}'.format(voltage*maxdrop/100, '\n'.join(f'{g:>4} AWG  {drop:.4f} V  ({drop/voltage*100:.2f}%)' for g,drop in eligible[:8]) or 'No listed gauge meets the target.')+'\n\nVoltage drop alone does not establish code-compliant ampacity.'
+    return 'Allowed voltage drop: {:.4f} V\n\n{}'.format(voltage*maxdrop/100, '\n'.join(f'{g:>4} AWG  {drop:.4f} V  ({drop/voltage*100:.2f}%)' for g,drop in eligible[:8]) or 'No listed gauge meets the target.')+'\n\nCircuit: '+('three-phase, line to line (√3 × I × L × R)' if circuit=='Three-phase' else 'DC / single-phase, out and back (2 × I × L × R)')+'.\n\nVoltage drop alone does not establish code-compliant ampacity.'

@@ -85,6 +85,15 @@ def line_velocity(q, d, kind):
                      'the actual ID.']
     return out
 
+ATM_PSIA = 14.7          # standard atmosphere for SCF/SCFM, as in Pneumatic Air Consumption
+
+
+def _need(ok, message):
+    """Input validation that survives `python -O` (unlike assert) and says what is wrong."""
+    if not ok:
+        raise ValueError(message)
+
+
 def calculate(name,a):
     x=[float(v) if not isinstance(v,str) or v.replace('.','',1).replace('-','',1).isdigit() else v for v in a]
     if name=='Conduit Fill':
@@ -92,42 +101,67 @@ def calculate(name,a):
         size=('%g' % size) if isinstance(size,float) else str(size)
         return conduit.conduit_fill(kind,size,rows,nipple)
     if name=='Hydraulic Cylinder':
-        b,r,s,p,q=x;assert b>r>=0 and s>=0 and p>=0 and q>0
+        b,r,s,p,q=x
+        _need(b>0,'Bore must be greater than zero.');_need(0<=r<b,'Rod diameter must be zero or more and smaller than the bore.')
+        _need(s>=0 and p>=0,'Stroke and pressure must be zero or more.');_need(q>0,'Flow must be greater than zero.')
         cap=math.pi*b*b/4;ann=math.pi*(b*b-r*r)/4
         return {'Extend force (lbf)':cap*p,'Retract force (lbf)':ann*p,'Extend time (s)':cap*s/231/q*60,'Retract time (s)':ann*s/231/q*60,'Cap area (in²)':cap,'Annulus area (in²)':ann}
     if name=='Hydraulic Motor':
-        d,p,r,ve,me=x;assert d>0 and p>=0 and r>=0 and 0<ve<=100 and 0<me<=100
+        d,p,r,ve,me=x
+        _need(d>0,'Displacement must be greater than zero.');_need(p>=0 and r>=0,'Pressure and speed must be zero or more.')
+        _need(0<ve<=100 and 0<me<=100,'Efficiencies must be more than 0 % and at most 100 %.')
         return {'Torque (lb-ft)':p*(d/16.387064)/(2*math.pi)*me/100/12,'Flow (GPM)':d*r/3785.411784/(ve/100),'Output HP':p*d*r/3785.411784/(1714)*me/100}
     if name=='Heat Load & Cooler Sizing':
-        pressure,flow,loss,margin=x;assert pressure>=0 and flow>=0 and 0<=loss<=100 and margin>=0
+        pressure,flow,loss,margin=x
+        _need(pressure>=0 and flow>=0,'Pressure and flow must be zero or more.')
+        _need(0<=loss<=100,'Estimated loss must be between 0 % and 100 %.');_need(margin>=0,'Cooler margin must be zero or more.')
         hp=pressure*flow/1714*loss/100;return {'Heat load (HP)':hp,'Heat load (kW)':hp*0.7457,'Cooler target (kW)':hp*0.7457*(1+margin/100)}
     if name=='Hydraulic Accumulator':
-        p1,p2,p0,v2,n=x;assert 0<p0<p1<p2 and v2>0 and n>0
+        p1,p2,p0,v2,n=x
+        _need(0<p0<p1<p2,'Absolute pressures must satisfy 0 < precharge < minimum < maximum.')
+        _need(v2>0,'Usable discharge must be greater than zero.');_need(n>0,'Polytropic exponent must be greater than zero.')
         # Gas volume required for requested discharge between p2 and p1
         ratio=(p0/p1)**(1/n)-(p0/p2)**(1/n)
         return {'Required gas volume (gal)':v2/ratio,'Precharge pressure (PSI)':p0,'Gas exponent':n}
     if name=='Pneumatic Cylinder':
-        b,r,p,stroke,flow=x;assert b>r>=0 and p>=0 and stroke>=0 and flow>0
+        b,r,p,stroke,flow=x
+        _need(b>0,'Bore must be greater than zero.');_need(0<=r<b,'Rod diameter must be zero or more and smaller than the bore.')
+        _need(p>=0 and stroke>=0,'Pressure and stroke must be zero or more.');_need(flow>0,'Supply flow must be greater than zero.')
         cap=math.pi*b*b/4;ann=math.pi*(b*b-r*r)/4
-        return {'Extend force (lbf)':cap*p,'Retract force (lbf)':ann*p,'Extend time (s)':cap*stroke/1728/flow*60,'Retract time (s)':ann*stroke/1728/flow*60}
+        ratio=(p+ATM_PSIA)/ATM_PSIA                     # free air needed to fill a volume at line pressure
+        ext_scf=cap*stroke/1728*ratio;ret_scf=ann*stroke/1728*ratio
+        return {'Extend force (lbf)':cap*p,'Retract force (lbf)':ann*p,'Extend time (s)':ext_scf/flow*60,
+                'Retract time (s)':ret_scf/flow*60,'Free air per cycle (SCF)':ext_scf+ret_scf,
+                '_notes':['Supply flow is free air (SCFM), as valves and compressors are rated. Times assume the '
+                          'supply delivers that flow at the stated pressure; valve and line restrictions, '
+                          'load and cushions make real strokes slower.']}
     if name=='Compressed Air Horsepower':
-        scfm,p1,p2,eff=x;assert scfm>=0 and p1>0 and p2>=p1 and 0<eff<=100
-        kw=(scfm*0.00047194745)*p1*6894.757293*math.log(p2/p1)/(eff/100)/1000
+        scfm,p1,p2,eff=x
+        _need(scfm>=0,'Flow must be zero or more.');_need(p1>0 and p2>=p1,'Pressures are absolute: inlet above zero and outlet at least the inlet.')
+        _need(0<eff<=100,'Efficiency must be more than 0 % and at most 100 %.')
+        # Isothermal work: P = p1 Q1 ln(p2/p1), and p1 Q1 = p_std Q_std for the same mass of air (Boyle), so the
+        # flow in SCFM is used with standard pressure, whatever the inlet pressure (second stage, booster).
+        kw=(scfm*0.00047194745)*ATM_PSIA*6894.757293*math.log(p2/p1)/(eff/100)/1000
         return {'Idealized isothermal input (kW)':kw,'Input (HP)':kw/0.745699872}
     if name=='Line Velocity':
         q,d=x[0],x[1]
         return line_velocity(q,d,x[2] if len(x)>2 else 'Pressure line (up to 3,000 PSI)')
     if name=='Pressure Drop Calculator':
-        q,d,L,sg,nu,rough=x;assert q>0 and d>0 and L>=0 and sg>0 and nu>0 and rough>=0
+        q,d,L,sg,nu,rough=x
+        _need(q>0 and d>0,'Flow and inside diameter must be greater than zero.');_need(L>=0,'Length must be zero or more.')
+        _need(sg>0 and nu>0,'Specific gravity and viscosity must be greater than zero.');_need(rough>=0,'Roughness must be zero or more.')
         velocity=q*6.30901964e-5/(math.pi*(d*.0254)**2/4);Re=velocity*d*.0254/(nu*1e-6)
         f=64/Re if Re<2300 else .25/(math.log10((rough*.001)/(3.7*d*.0254)+5.74/Re**.9)**2)
         pa=f*(L*.3048/(d*.0254))*(sg*1000)*velocity**2/2
         return {'Velocity (m/s)':velocity,'Reynolds number':Re,'Darcy friction factor':f,'Pressure drop (PSI)':pa/6894.757293}
     if name=='Orifice Flow Estimate':
-        d,dp,sg,cd=x;assert d>0 and dp>=0 and sg>0 and 0<cd<=1
+        d,dp,sg,cd=x
+        _need(d>0 and sg>0,'Diameter and specific gravity must be greater than zero.');_need(dp>=0,'Pressure differential must be zero or more.')
+        _need(0<cd<=1,'Discharge coefficient must be more than 0 and at most 1.')
         return {'Flow (GPM)':29.84*cd*d*d*math.sqrt(dp/sg),'Area (in²)':math.pi*d*d/4}
     if name=='Labor Savings':
-        old,new,cycles,rate=x;assert old>=0 and new>=0 and cycles>=0 and rate>=0
+        old,new,cycles,rate=x
+        _need(min(old,new,cycles,rate)>=0,'Times, cycles and rate must be zero or more.')
         hours=(old-new)*cycles/60;return {'Hours saved':hours,'Labor savings ($)':hours*rate}
     raise KeyError(name)
 
@@ -138,7 +172,7 @@ EXTRA={
 'Hydraulic Motor':[('Displacement (cc/rev)','250'),('Pressure (PSI)','2500'),('Speed (RPM)','1800'),('Volumetric efficiency (%)','90'),('Mechanical efficiency (%)','90')],
 'Heat Load & Cooler Sizing':[('System pressure (PSI)','2500'),('Flow (GPM)','20'),('Estimated loss (%)','15'),('Cooler margin (%)','20')],
 'Hydraulic Accumulator':[('Minimum pressure (PSIA)','1500'),('Maximum pressure (PSIA)','2500'),('Precharge (PSIA)','1200'),('Usable discharge (gal)','1'),('Polytropic exponent','1.4')],
-'Pneumatic Cylinder':[('Bore (in)','3'),('Rod (in)','1'),('Pressure (PSIG)','90'),('Stroke (in)','12'),('Flow (CFM)','5')],
+'Pneumatic Cylinder':[('Bore (in)','3'),('Rod (in)','1'),('Pressure (PSIG)','90'),('Stroke (in)','12'),('Supply flow (SCFM)','5')],
 'Compressed Air Horsepower':[('Flow (SCFM)','100'),('Inlet absolute pressure (PSIA)','14.7'),('Outlet absolute pressure (PSIA)','114.7'),('Efficiency (%)','75')],
 'Line Velocity':[('Flow (GPM)','20'),('Inside diameter (in)','1'),('Line type',Choice(list(LINE_TYPES),'Pressure line (up to 3,000 PSI)'))],
 'Pressure Drop Calculator':[('Flow (GPM)','20'),('Inside diameter (in)','1'),('Length (ft)','50'),('Specific gravity','0.87'),('Viscosity (cSt)','32'),('Roughness (mm)','0.045')],

@@ -13,12 +13,34 @@ def hydraulic_power(psi, gpm, efficiency):
     hp=psi*gpm/1714.0
     return {'hydraulic_hp':hp,'input_hp':hp/e,'loss_hp':hp*(1/e-1)}
 
-def cylinder_buckling(diameter, unsupported_length, E, K, safety_factor, applied_load):
+def cylinder_buckling(diameter, unsupported_length, E, K, safety_factor, applied_load, yield_psi=None):
+    """Buckling of a solid round rod. Euler for slender columns; with a yield strength, the Johnson parabola for
+    intermediate columns (KL/r below the transition slenderness Cc = sqrt(2 pi^2 E / Sy)), where Euler would
+    overstate the capacity."""
     d=positive(diameter,'Diameter'); L=positive(unsupported_length,'Unsupported length'); E=positive(E,'Modulus')
     K=positive(K,'End factor'); sf=positive(safety_factor,'Safety factor'); load=positive(applied_load,'Load',True)
     I=math.pi*d**4/64
-    critical=math.pi**2*E*I/(K*L)**2
-    return {'I':I,'critical_lbf':critical,'allowable_lbf':critical/sf,'passes_euler':load<=critical/sf}
+    area=math.pi*d*d/4
+    r=d/4                                            # radius of gyration of a solid round section
+    slender=K*L/r
+    euler=math.pi**2*E*I/(K*L)**2
+    out={'I':I}
+    critical=euler
+    if yield_psi is not None:
+        sy=positive(yield_psi,'Yield strength')
+        cc=math.sqrt(2*math.pi**2*E/sy)
+        out['Slenderness ratio']=slender
+        out['Transition slenderness']=cc
+        if slender<cc:
+            critical=area*(sy-(sy*slender/(2*math.pi))**2/E)
+            out['Buckling method']='Johnson (intermediate column)'
+            out['Euler critical load (lbf)']=euler
+            out['_checks']=[('warn','KL/r = %.0f is below the transition slenderness %.0f: Euler would overstate the '
+                                    'capacity (%.0f lbf), so the Johnson formula is used.' % (slender, cc, euler))]
+        else:
+            out['Buckling method']='Euler (slender column)'
+    out.update({'critical_lbf':critical,'allowable_lbf':critical/sf,'passes_euler':load<=critical/sf})
+    return out
 
 def cylinder_cycle(bore, rod, stroke, gpm_extend, gpm_retract):
     b=positive(bore,'Bore'); r=positive(rod,'Rod',True); s=positive(stroke,'Stroke'); qe=positive(gpm_extend,'Extend flow'); qr=positive(gpm_retract,'Retract flow')

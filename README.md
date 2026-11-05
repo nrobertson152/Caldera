@@ -26,6 +26,7 @@ projects you can export, back up and share. It runs entirely on your machine: no
 
 - **21 live calculators.** No Calculate button: unit-aware result cards, a highlighted headline value, pass/fail
   banners and a sensitivity chart showing how each output responds to each input.
+- **Checked against hand calculations.** Every calculator is tested against reference values worked out independently (SI units, alternative formulas, NEC and AWG tables).
 - **Inputs that accept math.** Type `30/2`, `2*pi*1.5` or `1,234.5`. Use ↑ / ↓ to step a value (Shift for ×10).
 - **US customary or metric.** One setting switches every input, result, chart and caption between the two.
 - **Tabs and a command palette.** Work in several tabs, each with its own back / forward history, restored on

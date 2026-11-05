@@ -22,7 +22,7 @@ TABLE = {
     'CFM': ('L/min', 28.316846592), 'SCFM': ('NL/min', 28.316846592), 'SCF': ('NL', 28.316846592),
 }
 # quantity-specific overrides where the plain unit swap would give an unhelpful metric unit
-LABEL_OVERRIDES = {'Modulus': ('MPa', 0.00689475729)}
+LABEL_OVERRIDES = {'Modulus': ('MPa', 0.00689475729), 'Yield strength': ('MPa', 0.00689475729)}
 
 
 def metric():

@@ -196,7 +196,7 @@ class HistoryPage(ScrollPage):
 
         specs = TOOLS.get(tool, ([], None))[0]
         inputs = rec.get('inputs') or []
-        if specs and inputs and len(specs) == len(inputs):
+        if specs and inputs and len(inputs) <= len(specs):          # older results: inputs added later are left out
             self.detail_lay.addWidget(eyebrow('Inputs'))
             grid = QGridLayout()
             grid.setHorizontalSpacing(14)

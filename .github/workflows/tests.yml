@@ -6,6 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30          # a job takes ~5 min; a stuck runner (apt, display) fails instead of running for hours
     strategy:
       fail-fast: false
       matrix:

@@ -4,9 +4,11 @@ from datetime import datetime
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QColor
+from shiboken6 import isValid
 from PySide6.QtWidgets import (QApplication, QFrame, QGridLayout, QLineEdit, QMenu, QPlainTextEdit, QTableWidget,
                                QTableWidgetItem, QWidget)
 
+from .. import revisionworx as rwxlink
 from ..registry import TOOLS
 from .. import units
 from ..toolmeta import category_of, icon_of, parse_number, split_label
@@ -220,6 +222,7 @@ class HistoryPage(ScrollPage):
         note.setFixedHeight(76)
         note.textChanged.connect(lambda: self._note_changed(idx, note.toPlainText()))
         self.detail_lay.addWidget(note)
+        self._rwx_section(idx, rec)
         self.detail_lay.addWidget(eyebrow('Result'))
         box = QFrame()
         box.setObjectName('tile')
@@ -240,6 +243,53 @@ class HistoryPage(ScrollPage):
         row2.addWidget(button('Duplicate', '', 'copy', lambda: self._duplicate(idx)), 1)
         self.detail_lay.addLayout(row2)
         self.detail_lay.addWidget(button('Delete', 'danger', 'trash', lambda: self._delete(idx)))
+
+    def _rwx_section(self, idx, rec):
+        """The RevisionWorx document this calculation belongs to, with its live revision and state."""
+        link = rwxlink.record_link(rec)
+        if not self.win.rwx and not link:
+            return
+        self.detail_lay.addWidget(eyebrow('RevisionWorx document'))
+        row = hbox(None, (0, 0, 0, 0), 8)
+        if link:
+            pill = Pill(link.get('number') or link.get('title') or 'Linked document', 'Muted')
+            pill.setToolTip(link.get('title', ''))
+            self.rwx_pill = pill
+            row.addWidget(pill)
+            row.addStretch(1)
+            if self.win.rwx:
+                row.addWidget(button('Show', 'ghost', None, lambda: self.win.show_in_rwx(link['id'])))
+                self.win.in_background(lambda: self.win.rwx.document(link['id']),
+                                       lambda doc, err: self._rwx_status(pill, doc, err))
+            row.addWidget(button('Unlink', 'ghost', None, lambda: self._rwx_unlink(idx)))
+        else:
+            row.addWidget(button('Link to a document…', '', 'file',
+                                 lambda: self._rwx_link(idx)))
+            row.addStretch(1)
+        self.detail_lay.addLayout(row)
+
+    @staticmethod
+    def _rwx_status(pill, doc, err):
+        if not isValid(pill):
+            return
+        if err is not None:
+            missing = getattr(err, 'kind', '') == 'not-found'
+            pill.setText('%s · %s' % (pill.text().split(' · ')[0], 'not found' if missing else 'status unavailable'))
+            pill.setObjectName('pillWarn')
+        else:
+            text, kind = rwxlink.doc_line(doc)
+            pill.setText(text)
+            pill.setObjectName('pill' + kind)
+        pill.style().unpolish(pill)
+        pill.style().polish(pill)
+
+    def _rwx_link(self, idx):
+        if self.win.link_record_to_rwx(idx):
+            self.render_detail(idx)
+
+    def _rwx_unlink(self, idx):
+        if self.win.unlink_record_from_rwx(idx):
+            self.render_detail(idx)
 
     # ------------------------------------------------------------------ actions
     def _note_changed(self, idx, text):
@@ -399,6 +449,18 @@ def project_page(win):
                             'muted' if notes else 'faint', wrap=True)
             snippet.setMaximumHeight(60)
             card.body.addWidget(snippet)
+            link = rwxlink.project_link(win.data, name)
+            if link:
+                prow = hbox(None, (0, 0, 0, 0), 6)
+                pill = Pill('RevisionWorx: %s' % link['number'], 'Muted')
+                pill.setToolTip('The project summary is published to RevisionWorx as this document')
+                prow.addWidget(pill)
+                prow.addStretch(1)
+                card.body.addLayout(prow)
+                card.rwx_pill = pill
+                if win.rwx:
+                    win.in_background(lambda d=link['document']: win.rwx.document(d),
+                                      lambda doc, err, p=pill: HistoryPage._rwx_status(p, doc, err))
             card.body.addStretch(1)
             actions = hbox(None, (0, 0, 0, 0), 8)
             if not is_active:
@@ -462,6 +524,17 @@ def _project_menu(win, name, anchor):
     menu.addAction('Edit notes…').triggered.connect(lambda checked=False: win.edit_project_notes(name))
     menu.addAction('Export project (.caldera)…').triggered.connect(lambda checked=False: win.export_project(name))
     menu.addAction('Export PDF summary…').triggered.connect(lambda checked=False: win.export_project_pdf(name))
+    link = rwxlink.project_link(win.data, name)
+    if win.rwx:
+        menu.addSeparator()
+        menu.addAction('Publish summary to RevisionWorx…').triggered.connect(
+            lambda checked=False: win.publish_project_to_rwx(name))
+        if link:
+            menu.addAction('Show in RevisionWorx').triggered.connect(
+                lambda checked=False: win.show_in_rwx(link['document']))
+    if link:
+        menu.addAction('Unlink from RevisionWorx').triggered.connect(
+            lambda checked=False: win.unlink_project_from_rwx(name))
     menu.addSeparator()
     arch = menu.addAction('Archive project')
     arch.setEnabled(name != 'General')

@@ -38,8 +38,10 @@ def _register_fonts():
     return 'Helvetica', 'Helvetica-Bold', 'Courier'
 
 
-def build_pdf(path, title, blocks, subtitle=''):
-    """blocks: list of (heading, body) tuples; heading may be ''. Body keeps its line breaks."""
+def build_pdf(path, title, blocks, subtitle='', invariant=False):
+    """blocks: list of (heading, body) tuples; heading may be ''. Body keeps its line breaks.
+    ``invariant``: the same content gives the same bytes (no creation time or random file id), so a document
+    management system can tell an unchanged report from a new one."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import ParagraphStyle
@@ -75,7 +77,8 @@ def build_pdf(path, title, blocks, subtitle=''):
         group.append(Spacer(1, 6))
         story.append(KeepTogether(group))
     doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.8 * inch, rightMargin=0.8 * inch,
-                            topMargin=0.8 * inch, bottomMargin=0.85 * inch, title=title, author='Caldera')
+                            topMargin=0.8 * inch, bottomMargin=0.85 * inch, title=title, author='Caldera',
+                            invariant=1 if invariant else None)
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
 
 

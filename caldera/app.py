@@ -3,6 +3,7 @@ The look lives in caldera/ui/ (theme, widgets, chrome, pages_*)."""
 import json
 import sys
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -11,10 +12,12 @@ from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QWidget
 
 from . import __version__, exports, units, workspace
+from . import revisionworx as rwxlink
 from .registry import TOOL_PAGES, TOOLS
 from .toolmeta import CATEGORIES, SYSTEM_PAGES, blurb_of, icon_of
 from .ui import pages_core, pages_data, pages_tools, theme
-from .ui.chrome import CommandPalette, Sidebar, TabBar, Topbar, choose, confirm, prompt, prompt_multiline
+from .ui.chrome import (CommandPalette, Sidebar, TabBar, Topbar, choose, confirm, prompt, prompt_multiline,
+                        rwx_pick_document, rwx_publish_dialog)
 from .ui.pages_data import empty_state
 from .ui.widgets import ScrollPage, Toast, button, fade_in, hbox, vbox
 
@@ -52,7 +55,7 @@ class Tab:
 
 
 class Window(QMainWindow):
-    def __init__(self):
+    def __init__(self, rwx=None):
         super().__init__()
         self.store_path = STORE
         self.data, self.notice = workspace.load(STORE)
@@ -65,6 +68,9 @@ class Window(QMainWindow):
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(700)
         self._save_timer.timeout.connect(self.save)
+        # RevisionWorx (optional): None while looking for it, False when not installed, else a client.
+        self.rwx = None
+        self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='caldera-bg')
 
         name = self.data.get('theme')
         self._apply_theme(name if name in theme.THEMES else theme.DEFAULT_THEME)
@@ -102,6 +108,10 @@ class Window(QMainWindow):
             QShortcut(QKeySequence(keys), self).activated.connect(fn)
 
         self._show_current()
+        if rwx is not None:
+            self.rwx = rwx
+        else:
+            self.in_background(rwxlink.probe, self._rwx_ready)
         if self.notice:
             QTimer.singleShot(500, lambda: self.toast(self.notice, 'warn'))
 
@@ -139,6 +149,7 @@ class Window(QMainWindow):
     def closeEvent(self, ev):
         self.data['window'] = [self.width(), self.height()]
         self.save()
+        self._pool.shutdown(wait=False)
         super().closeEvent(ev)
 
     # ------------------------------------------------------------------ feedback + dialogs
@@ -466,6 +477,7 @@ class Window(QMainWindow):
             notes[new] = notes.pop(old)
         if d['active_project'] == old:
             d['active_project'] = new
+        rwxlink.rename_project(d, old, new)
         if self.history_project == old:
             self.history_project = new
         self.save()
@@ -627,6 +639,118 @@ class Window(QMainWindow):
         self.navigate('Project Dashboard', force=True)
         extra = ' (%d already present)' % skipped if skipped else ''
         self.toast('Imported “%s”: %d result%s%s' % (name, added, '' if added == 1 else 's', extra))
+
+    # ------------------------------------------------------------------ RevisionWorx (optional)
+    def in_background(self, fn, done):
+        """Run ``fn`` off the UI thread; call ``done(value, error)`` on the UI thread when it finishes."""
+        fut = self._pool.submit(fn)
+
+        def check():
+            if not fut.done():
+                QTimer.singleShot(50, check)
+                return
+            try:
+                value, error = fut.result(), None
+            except Exception as e:
+                value, error = None, e
+            try:
+                done(value, error)
+            except RuntimeError:          # the widget it was for has been rebuilt meanwhile
+                pass
+        QTimer.singleShot(50, check)
+
+    def _rwx_ready(self, rwx, _error):
+        self.rwx = rwx or False
+        if self.rwx and self.current in ('Project Dashboard', 'Calculation History'):
+            self.open_page(self.current)
+
+    def _rwx_busy(self, fn):
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            return fn()
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def publish_project_to_rwx(self, name):
+        """The project's PDF summary into RevisionWorx: a new document the first time, then new revisions."""
+        if not self.rwx:
+            self.toast('RevisionWorx is not installed (or was not found)', 'info')
+            return None
+        link = rwxlink.project_link(self.data, name)
+        extra = {}
+        try:
+            if link is None:
+                projects = self._rwx_busy(self.rwx.projects)
+                if not projects:
+                    self.toast('Create a project in RevisionWorx first', 'warn')
+                    return None
+                got = rwx_publish_dialog(self, name, projects, rwxlink.default_number(name))
+                if not got:
+                    return None
+                extra = {'rwx_project': got[0], 'number': got[1], 'title': got[2]}
+            elif not self.confirm('Publish to RevisionWorx', 'Publish the summary of “%s” as a new revision of %s? An '
+                                  'identical report records nothing.' % (name, link['number']), 'Publish', danger=False):
+                return None
+            rows = [r for r in self.data['history'] if r.get('project') == name]
+            notes = self.data.get('project_notes', {}).get(name, '')
+            subtitle = '%d saved calculation%s' % (len(rows), '' if len(rows) == 1 else 's')
+
+            def write(path):
+                exports.build_pdf(path, 'Project: %s' % name, exports.project_blocks(name, notes, rows), subtitle,
+                                  invariant=True)
+            result = self._rwx_busy(lambda: rwxlink.publish_project(self.rwx, self.data, name, write,
+                                                                    app_version=__version__, **extra))
+        except ImportError:
+            self.toast('Install reportlab to export PDF files', 'bad')
+            return None
+        except (rwxlink.RwxError, ValueError, OSError) as e:
+            self.toast(str(e), 'bad')
+            return None
+        self.save()
+        doc = result['document']
+        word = {'created': 'Published', 'revised': 'Published', 'unchanged': 'Unchanged:'}.get(result['result'],
+                                                                                            'Published')
+        self.toast('%s %s rev %s' % (word, doc.get('number', ''), (doc.get('latest') or {}).get('label', '')),
+                   'good' if result['result'] != 'unchanged' else 'info')
+        if self.current == 'Project Dashboard':
+            self.open_page(self.current)
+        return result
+
+    def unlink_project_from_rwx(self, name):
+        if rwxlink.unlink_project(self.data, name):
+            self.save()
+            self.open_page('Project Dashboard')
+            self.toast('Unlinked; the document stays in RevisionWorx', 'info')
+
+    def show_in_rwx(self, doc_id):
+        if self.rwx:
+            self.in_background(lambda: self.rwx.open(document=doc_id),
+                               lambda _v, e: e is not None and self.toast(str(e), 'bad'))
+
+    def link_record_to_rwx(self, idx):
+        if not self.rwx:
+            return None
+        try:
+            docs = self._rwx_busy(self.rwx.documents)
+        except rwxlink.RwxError as e:
+            self.toast(str(e), 'bad')
+            return None
+        if not docs:
+            self.toast('No documents in RevisionWorx yet', 'info')
+            return None
+        doc = rwx_pick_document(self, docs)
+        if doc is None:
+            return None
+        rwxlink.link_record(self.data['history'][idx], doc)
+        self.save()
+        self.toast('Linked to %s' % doc.get('number', ''))
+        return doc
+
+    def unlink_record_from_rwx(self, idx):
+        if rwxlink.unlink_record(self.data['history'][idx]):
+            self.save()
+            return True
+        return False
 
 
 def main():

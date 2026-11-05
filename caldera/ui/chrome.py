@@ -9,7 +9,8 @@ from ..registry import TOOLS
 from . import icons
 from .kit import IconTile, clear_layout
 from .theme import current as T
-from .widgets import (BrandMark, Field, NavHeader, NavItem, button, hbox, icon_button, icon_label, label, vbox)
+from .widgets import (BrandMark, Combo, Field, NavHeader, NavItem, button, hbox, icon_button, icon_label, label,
+                      vbox)
 
 
 # =========================================================================== modal sheets
@@ -120,6 +121,66 @@ def prompt_multiline(parent, title, caption, value=''):
     QTimer.singleShot(0, edit.setFocus)
     if dlg.run():
         return edit.toPlainText()
+    return None
+
+
+def rwx_publish_dialog(parent, name, projects, number):
+    """First publish of a Caldera project: pick the RevisionWorx project, number and title.
+    Returns (project_id, number, title) or None."""
+    dlg = Sheet(parent, 'Publish to RevisionWorx',
+                'The PDF summary of “%s” becomes a controlled document. Publishing again later adds a new revision; '
+                'an identical report records nothing.' % name, 'Publish', width=520)
+    dlg.body.addWidget(label('RevisionWorx project', 'muted'))
+    box = Combo([p['id'] for p in projects],
+                ['%s  %s' % (p.get('number', ''), p.get('name', '')) if p.get('number') else p.get('name', '')
+                 for p in projects])
+    dlg.body.addWidget(box)
+    dlg.body.addWidget(label('Document number', 'muted'))
+    num = Field(number, '', numeric=False)
+    dlg.body.addWidget(num)
+    dlg.body.addWidget(label('Title', 'muted'))
+    title = Field('Calculations: %s' % name, '', numeric=False)
+    dlg.body.addWidget(title)
+    dlg.rwx_fields = (box, num, title)
+    if dlg.run() and num.text().strip():
+        return box.value(), num.text().strip(), title.text().strip()
+    return None
+
+
+def rwx_pick_document(parent, docs):
+    """Choose a RevisionWorx document (to link a calculation to). Returns the document dict or None."""
+    dlg = Sheet(parent, 'Link to a RevisionWorx document',
+                'For example the drawing or schematic this calculation sizes. Its revision and state are shown beside '
+                'the result.', 'Link', width=560)
+    find = QLineEdit()
+    find.setPlaceholderText('Search number, title or project…')
+    find.setClearButtonEnabled(True)
+    dlg.body.addWidget(find)
+    lst = QListWidget()
+    lst.setObjectName('rwxDocuments')
+    lst.setMinimumHeight(260)
+    dlg.body.addWidget(lst)
+    shown = []
+
+    def fill(*_):
+        q = find.text().strip().lower()
+        lst.clear()
+        shown.clear()
+        for d in docs:
+            text = '%s  ·  %s  ·  %s' % (d.get('number', ''), d.get('title', ''), (d.get('project') or {}).get('name', ''))
+            if q and q not in text.lower():
+                continue
+            shown.append(d)
+            lst.addItem(text)
+        if shown:
+            lst.setCurrentRow(0)
+    find.textChanged.connect(fill)
+    lst.itemDoubleClicked.connect(lambda *_: dlg.accept())
+    fill()
+    dlg.rwx_widgets = (find, lst)
+    QTimer.singleShot(0, find.setFocus)
+    if dlg.run() and shown and lst.currentRow() >= 0:
+        return shown[lst.currentRow()]
     return None
 
 

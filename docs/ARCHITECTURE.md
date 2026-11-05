@@ -17,6 +17,8 @@ caldera/
 ├── toolmeta.py            navigation model, icons, formulas, parse_number, evaluate() -> Result
 ├── workspace.py           defaults, sanitize, atomic save/load, .caldera and .caldera_backup files
 ├── exports.py             PDF, CSV, XLSX and text reports
+├── revisionworx.py        optional RevisionWorx links (publish project summaries, link calculations)
+├── rwx_client.py          copy of RevisionWorx's contrib/rwx_client.py (runs `revisionworx link`)
 ├── assets/                icon, stylesheet, Inter font
 └── ui/
     ├── theme.py, widgets.py, kit.py   themes and custom-painted components
@@ -46,6 +48,16 @@ Location: `$CALDERA_DATA`, else `$XDG_DATA_HOME/caldera`, else `~/.local/share/c
 **UI.** `app.Window` owns a set of tabs; each `Tab` has its current page and its own back/forward stack, and the
 tab set is saved in the workspace. `navigate()` only changes the current tab; new tabs come from `new_tab()`.
 
+## RevisionWorx (optional)
+
+`revisionworx.py` keeps two links in the workspace:
+- `rwx_links[project]` is the document that holds the project summary;
+- a history record's `rwx` is the document the calculation belongs to.
+
+It calls RevisionWorx through `rwx_client.py`, which runs `revisionworx link` and reads JSON. Status lookups run off
+the UI thread (`Window.in_background`). Window, page and widgets check `win.rwx`, which is None while Caldera looks
+for RevisionWorx, False when it is not installed, and a client when it is.
+
 ## Gotchas
 
 - Pages are rebuilt on every navigation; state lives in `win.data`, not in widgets.
@@ -58,4 +70,6 @@ tab set is saved in the workspace. `navigate()` only changes the current tab; ne
 |---|---|---|
 | `tests/test_core.py` | No | every calculator with defaults, number parsing, workspace persistence, exports, tank, 3D model, project/backup files |
 | `tests/test_migration.py` | No | regression values carried over from the earlier app |
+| `tests/test_revisionworx.py` | No | RevisionWorx links with a stand-in client, then the real RevisionWorx when installed |
+| `tests/test_rwx_gui.py` | Yes (offscreen) | publishing and linking from the real window (stand-in client) |
 | `tests/test_gui.py` | Yes (offscreen) | opens the real window, visits every page and saves a screenshot of each to `screenshots/` |

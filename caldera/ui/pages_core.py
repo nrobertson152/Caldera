@@ -9,7 +9,8 @@ from PySide6.QtGui import QColor
 from .. import units
 from ..registry import TOOLS
 from ..toolmeta import (CATEGORIES, CHOICE_ALIASES, FORMULAS, NOTES, DEFAULT_NOTE, blurb_of, category_of, evaluate,
-                        format_metric, icon_of, is_toggle, parse_number, split_label, status_kind, sweep_all)
+                        fill_inputs, format_metric, icon_of, is_toggle, parse_number, split_label, status_kind,
+                        sweep_all)
 from . import icons
 from .kit import (ClickRow, IconTile, ago, fit_table_height, page_header, section_title, stat_card, tool_card)
 from .theme import current as T
@@ -130,9 +131,8 @@ class CalculatorPage(ScrollPage):
         self._sweeps, self._chart_inputs = {}, []
         t = T()
         cat = category_of(name)
-        draft = win.data['drafts'].get(name, [])
-        if len(draft) != len(self.specs):          # layout changed since the draft was saved
-            draft = []
+        # inputs added since the draft was saved take their defaults; an unknown (longer) layout starts afresh
+        draft = fill_inputs(self.specs, win.data['drafts'].get(name, [])) or []
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(120)
@@ -511,14 +511,17 @@ class CalculatorPage(ScrollPage):
             self.win.toast('Preset “%s” saved' % name)
 
     def load_preset(self, name):
-        values = self.win.data['presets'].get(self.name, {}).get(name)
-        if not values or len(values) != len(self.inputs):
-            self.win.toast('That preset was saved for an older layout of this tool', 'warn')
+        saved = self.win.data['presets'].get(self.name, {}).get(name)
+        values = fill_inputs(self.specs, saved) if saved else None
+        if values is None:
+            self.win.toast('That preset was saved for a layout of this tool that this version does not know', 'warn')
             return
         for w, v in zip(self.inputs, values):
             set_value(w, v)
         self.recalc()
-        self.win.toast('Loaded preset “%s”' % name, 'info')
+        added = len(values) - len(saved)
+        self.win.toast('Loaded preset “%s”%s' % (name, '; %d newer input%s use%s the default' % (
+            added, '' if added == 1 else 's', 's' if added == 1 else '') if added else ''), 'info')
 
     def delete_preset(self, name):
         self.win.data['presets'].get(self.name, {}).pop(name, None)

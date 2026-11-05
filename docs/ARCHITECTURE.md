@@ -58,6 +58,12 @@ It calls RevisionWorx through `rwx_client.py`, which runs `revisionworx link` an
 the UI thread (`Window.in_background`). Window, page and widgets check `win.rwx`, which is None while Caldera looks
 for RevisionWorx, False when it is not installed, and a client when it is.
 
+## Calculator inputs are append-only
+
+Drafts, presets and saved results store a calculator's inputs as a positional list. Add new inputs **at the end**
+of a calculator's field list only: `toolmeta.fill_inputs` then opens older saved values with the new inputs at
+their defaults. Never reorder or remove inputs; give an unused one a neutral default instead.
+
 ## Gotchas
 
 - Pages are rebuilt on every navigation; state lives in `win.data`, not in widgets.
@@ -70,6 +76,8 @@ for RevisionWorx, False when it is not installed, and a client when it is.
 |---|---|---|
 | `tests/test_core.py` | No | every calculator with defaults, number parsing, workspace persistence, exports, tank, 3D model, project/backup files |
 | `tests/test_migration.py` | No | regression values carried over from the earlier app |
+| `tests/test_reference_values.py` | No | every calculator against independently derived values (SI units, other formulas, NEC/AWG tables); also run under `python -O` |
+| `tests/test_saved_inputs_gui.py` | Yes (offscreen) | older drafts, presets and history records open after a calculator gained an input |
 | `tests/test_revisionworx.py` | No | RevisionWorx links with a stand-in client, then the real RevisionWorx when installed |
 | `tests/test_rwx_gui.py` | Yes (offscreen) | publishing and linking from the real window (stand-in client) |
 | `tests/test_gui.py` | Yes (offscreen) | opens the real window, visits every page and saves a screenshot of each to `screenshots/` |

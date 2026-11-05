@@ -5,7 +5,26 @@ All notable changes to Caldera are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **Cylinder Buckling overstated the capacity of short rods.** It used Euler's formula for every rod, which is only
+  valid for slender ones. It now reports the slenderness ratio, uses the Johnson formula below the transition
+  slenderness (a new *Yield strength* input, default 50,000 PSI), and says when it did. Example: a 1 in × 10 in
+  rod went from 145,342 lbf to 36,617 lbf critical load.
+- **Pneumatic Cylinder stroke times were about 7× too short at 90 PSIG.** They treated the flow as air at line
+  pressure; the input is now *Supply flow (SCFM)*, free air as valves and compressors are rated, and the result adds
+  the free air used per cycle (matching Pneumatic Air Consumption).
+- **Compressed Air Horsepower was wrong whenever the inlet was not atmospheric** (second stage, booster): for the
+  same SCFM it scaled the power by the inlet pressure. Results at a 14.7 PSIA inlet are unchanged.
+- Out-of-range inputs on several calculators gave a generic message (and their checks disappeared under
+  `python -O`); each now says which input is wrong.
+- Re-opening a saved result, draft or preset from before a calculator gained an input no longer resets everything to
+  the defaults: the saved values are kept and only the new input takes its default.
+
 ### Added
+- **Wire Gauge & Voltage Drop: three-phase circuits** (√3 × I × L × R, line to line) next to DC / single-phase.
+- **Reference values for every calculator** (`tests/test_reference_values.py`, 50 checks): each result is compared
+  with an answer worked out another way (SI units, Hagen–Poiseuille, Colebrook–White, Q = C_d A √(2ΔP/ρ),
+  P = Tω, NEC and AWG tables). It runs in CI, also under `python -O`.
 - **RevisionWorx integration (optional).** When [RevisionWorx](https://github.com/nrobertson152/RevisionWorx) is
   installed:
   - A project's PDF summary can be published as a controlled document (project ⋯ → Publish summary to

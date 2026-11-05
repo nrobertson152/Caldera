@@ -22,10 +22,14 @@ jobs:
         run: pip install "revisionworx @ git+https://github.com/nrobertson152/RevisionWorx@main"
       - name: Calculation and workspace tests
         run: python3 tests/test_core.py && python3 tests/test_migration.py
+      - name: Reference values (every calculator against independent hand calculations)
+        run: python3 tests/test_reference_values.py && python3 -O tests/test_reference_values.py
       - name: RevisionWorx integration (real RevisionWorx, required)
         run: CALDERA_REQUIRE_RWX=1 python3 tests/test_revisionworx.py
       - name: RevisionWorx in the window (offscreen)
         run: QT_QPA_PLATFORM=offscreen python3 tests/test_rwx_gui.py
+      - name: Older saved inputs in the window (offscreen)
+        run: QT_QPA_PLATFORM=offscreen python3 tests/test_saved_inputs_gui.py
       - name: GUI smoke test (offscreen)
         run: QT_QPA_PLATFORM=offscreen python3 tests/test_gui.py
       - name: GUI interaction test (3D drag, chart hover)

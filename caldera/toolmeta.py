@@ -39,6 +39,25 @@ def is_text(default):
     return isinstance(default, Text)
 
 
+def spec_default(default):
+    """The stored (string) value a calculator input starts with."""
+    if isinstance(default, list):
+        return str(getattr(default, 'default', None) or default[0])
+    return str(default)
+
+
+def fill_inputs(specs, saved):
+    """Saved input values (draft, preset, history) for the current field list of a calculator.
+
+    New inputs are only ever appended to a calculator, so values saved before an input was added are still in
+    the right places: the missing ones at the end take their defaults. Returns None when the saved list is longer
+    than the field list (a layout this version does not know), so the caller can fall back to the defaults."""
+    saved = [str(v) for v in (saved or [])]
+    if len(saved) > len(specs):
+        return None
+    return saved + [spec_default(d) for _, d in specs[len(saved):]]
+
+
 # --------------------------------------------------------------------------- navigation model
 CATEGORIES = {
     'Hydraulic': ['Hydraulic Pump & Motor', 'Hydraulic Motor', 'Hydraulic Power & Efficiency', 'Hydraulic Cylinder',
@@ -68,7 +87,7 @@ META = {
     'Motor & Electrical Power': ('motor', 'Current draw from motor output, voltage, efficiency and power factor.'),
     'Hydraulic Pump & Motor': ('pump', 'Pump flow, hydraulic output and shaft input from displacement and speed.'),
     'Hydraulic Power & Efficiency': ('gauge', 'Hydraulic horsepower, input power and heat loss.'),
-    'Cylinder Buckling': ('ruler', 'Euler column check for cylinder rods and struts.'),
+    'Cylinder Buckling': ('ruler', 'Euler and Johnson column check for cylinder rods and struts.'),
     'Hydraulic Cylinder Cycle Time': ('timer', 'Extend and retract time from bore, rod, stroke and flow.'),
     'Pneumatic Air Consumption': ('wind', 'Free-air demand of a double-acting cylinder in SCFM.'),
     'Torque, RPM & Power': ('cog', 'Convert between torque, speed and power.'),
@@ -101,7 +120,11 @@ FORMULAS = {
     'Hydraulic Pump & Motor': ['Q_theoretical (GPM) = D (cc/rev) × n / 3785.41', 'Q_actual = Q_theoretical × η_vol',
                                'P_hyd (HP) = psi × Q / 1714', 'P_shaft = P_hyd / η_mech'],
     'Hydraulic Power & Efficiency': ['P_hyd (HP) = psi × GPM / 1714', 'P_input = P_hyd / η', 'P_loss = P_hyd × (1/η − 1)'],
-    'Cylinder Buckling': ['I = π d⁴ / 64', 'P_cr = π² E I / (K L)²', 'P_allow = P_cr / SF'],
+    'Cylinder Buckling': ['I = π d⁴ / 64        A = π d² / 4        r = d / 4        λ = K L / r',
+                          'C_c = √(2 π² E / S_y)      (transition slenderness)',
+                          'λ ≥ C_c (slender):  P_cr = π² E I / (K L)²      (Euler)',
+                          'λ < C_c (intermediate):  P_cr = A [S_y − (S_y λ / 2π)² / E]      (Johnson)',
+                          'P_allow = P_cr / SF'],
     'Hydraulic Cylinder Cycle Time': ['A_cap = π b² / 4        A_ann = π (b² − r²) / 4', 'V (gal) = A × stroke / 231',
                                       't (s) = V / Q × 60'],
     'Pneumatic Air Consumption': ['V_swept (ft³) = π/4 × (2b² − r²) × stroke / 1728',
@@ -123,8 +146,13 @@ FORMULAS = {
     'Heat Load & Cooler Sizing': ['P_heat (HP) = psi × GPM / 1714 × loss %', 'kW = HP × 0.7457',
                                   'Cooler target = kW × (1 + margin %)'],
     'Hydraulic Accumulator': ['V₀ = ΔV / [ (P₀/P₁)^(1/n) − (P₀/P₂)^(1/n) ]', 'Pressures absolute; P₀ < P₁ < P₂'],
-    'Pneumatic Cylinder': ['F = P × A', 't = A × stroke / 1728 / CFM × 60'],
-    'Compressed Air Horsepower': ['P_iso = P₁ × Q₁ × ln(P₂ / P₁)', 'P_input = P_iso / η'],
+    'Pneumatic Cylinder': ['F = P_gauge × A', 'V_free (SCF) = A × stroke / 1728 × (P_gauge + 14.7) / 14.7',
+                           't (s) = V_free / SCFM × 60'],
+    'Compressed Air Horsepower': ['P_iso = P_std × Q_std × ln(P₂ / P₁)      (Q in SCFM, P_std = 14.7 PSIA)',
+                                  'P_input = P_iso / η'],
+    'Wire Gauge & Voltage Drop': ['R = R₂₀ (Ω/1000 ft) × (1 + 0.00393 (T − 20))      aluminum: × 1.64',
+                                  'DC / single-phase:  V = 2 × I × L × R / 1000',
+                                  'Three-phase (line to line):  V = √3 × I × L × R / 1000'],
     'Line Velocity': ['v (ft/s) = 0.3208 × Q (GPM) / A (in²)        A = π d² / 4',
                       'd_min = √(4 × 0.3208 × Q / (v_max × π))',
                       'v_max: suction 4, return 15, pressure 20 (25 above 3,000 PSI) ft/s'],
@@ -137,8 +165,10 @@ FORMULAS = {
 NOTES = {
     'Wire Gauge & Voltage Drop': 'Voltage drop depends on conductor resistance, one-way distance, load current and '
                                  'return path. Ampacity requires a separate code assessment.',
-    'Cylinder Buckling': 'Euler buckling applies to slender members. Check end-fixity factor and consider '
-                         'side loading and manufacturer rod ratings.',
+    'Cylinder Buckling': 'Solid round rod. Euler governs slender rods; below the transition slenderness the '
+                         'Johnson formula is used because Euler would overstate the capacity. Use the rod '
+                         'material\'s yield strength, check the end-fixity factor, and consider side loading, '
+                         'eccentricity and the manufacturer\'s rod ratings.',
     'Unit Converter': 'Conversions use fixed physical ratios. US customary gallons are assumed.',
     'Pneumatic Air Consumption': 'Estimated from cylinder displacement, pressure ratio and cycle frequency.',
 }
@@ -392,6 +422,9 @@ def _normalize_wire(raw):
     else:
         r.metrics = [Metric('Allowed drop', allowed, 'V')]
         r.status.append((False, 'No listed conductor meets the target'))
+    circuit = re.search(r'Circuit: ([^.]+)\.', raw)
+    if circuit:
+        r.notes.append('Circuit: %s.' % circuit.group(1))
     r.notes.append('Voltage drop alone does not establish code-compliant ampacity.')
     return r
 

@@ -9,9 +9,10 @@ DEFAULTS = {
     'theme': 'Obsidian', 'projects': ['General'], 'active_project': 'General', 'history': [], 'presets': {},
     'drafts': {}, 'favorites': [], 'project_notes': {}, 'archived_projects': [], 'tables': {},
     'methodology_notes': {}, 'units': 'US Customary', 'precision': 3, 'auto_save': False, 'nav_collapsed': [],
-    'sidebar_collapsed': False, 'report_draft': {}, 'note_drafts': {},
+    'sidebar_collapsed': False, 'report_draft': {}, 'note_drafts': {}, 'rwx_links': {},
 }
-_DICT_KEYS = ('presets', 'drafts', 'project_notes', 'tables', 'report_draft', 'methodology_notes', 'note_drafts')
+_DICT_KEYS = ('presets', 'drafts', 'project_notes', 'tables', 'report_draft', 'methodology_notes', 'note_drafts',
+              'rwx_links')
 _LIST_KEYS = ('favorites', 'archived_projects', 'nav_collapsed')
 
 

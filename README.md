@@ -42,6 +42,16 @@ projects you can export, back up and share. It runs entirely on your machine: no
   workspace as `.caldera_backup`. Saves are atomic, and a damaged workspace is set aside, never overwritten.
 - **Five themes.** Obsidian, Midnight, Graphite, Light and Terracotta, with a one-click light / dark toggle.
 
+### RevisionWorx
+
+When [RevisionWorx](https://github.com/nrobertson152/RevisionWorx) (the offline PDM) is installed, Caldera can:
+
+- publish a project's PDF summary as a controlled document. Later publishes add revisions, and an identical report
+  records nothing;
+- link a saved calculation to the drawing or schematic it sizes, and show that document's live revision and state.
+
+Without RevisionWorx these commands are simply hidden.
+
 ## Calculators
 
 | Discipline | Tools |

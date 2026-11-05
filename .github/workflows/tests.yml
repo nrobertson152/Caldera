@@ -18,8 +18,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
       - name: Install Python packages
         run: pip install -r requirements.txt
+      - name: RevisionWorx (for the integration tests)
+        run: pip install "revisionworx @ git+https://github.com/nrobertson152/RevisionWorx@main"
       - name: Calculation and workspace tests
         run: python3 tests/test_core.py && python3 tests/test_migration.py
+      - name: RevisionWorx integration (real RevisionWorx, required)
+        run: CALDERA_REQUIRE_RWX=1 python3 tests/test_revisionworx.py
+      - name: RevisionWorx in the window (offscreen)
+        run: QT_QPA_PLATFORM=offscreen python3 tests/test_rwx_gui.py
       - name: GUI smoke test (offscreen)
         run: QT_QPA_PLATFORM=offscreen python3 tests/test_gui.py
       - name: GUI interaction test (3D drag, chart hover)

@@ -5,6 +5,19 @@ All notable changes to Caldera are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **RevisionWorx integration (optional).** When [RevisionWorx](https://github.com/nrobertson152/RevisionWorx) is
+  installed:
+  - A project's PDF summary can be published as a controlled document (project ⋯ → Publish summary to
+    RevisionWorx). Publishing again adds a revision, and an identical report records nothing.
+  - The project card shows the document's revision and state.
+  - A saved calculation can be linked to the RevisionWorx document it belongs to (a drawing, a schematic), with its
+    live revision and state shown in History.
+  - Caldera talks to RevisionWorx only through `revisionworx link` (`caldera/rwx_client.py`). Without RevisionWorx
+    nothing changes.
+- PDF exports can be byte-identical for identical content (`build_pdf(..., invariant=True)`), so a document system
+  can tell an unchanged report from a new one.
+
 ## [1.1.0] - 2026-10-30
 
 ### Added
